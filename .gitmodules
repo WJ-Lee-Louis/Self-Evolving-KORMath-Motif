@@ -1,0 +1,6 @@
+[submodule "upstream/gepa"]
+	path = upstream/gepa
+	url = https://github.com/gepa-ai/gepa.git
+[submodule "datasets/HRM8K"]
+	path = datasets/HRM8K
+	url = https://huggingface.co/datasets/HAERAE-HUB/HRM8K.git

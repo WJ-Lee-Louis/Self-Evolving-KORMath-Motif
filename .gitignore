@@ -1,0 +1,23 @@
+# Credentials and machine-specific settings
+.env
+.env.*
+!.env.example
+
+# Python and local tools
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Generated experiments and downloaded results
+runs/
+downloaded-*/
+*.log
+
+# Temporary editor and operating-system files
+*.tmp
+.DS_Store
+Thumbs.db
