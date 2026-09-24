@@ -5,6 +5,7 @@
 
 # Python and local tools
 .venv/
+.git-history-backup/
 __pycache__/
 *.py[cod]
 *.egg-info/

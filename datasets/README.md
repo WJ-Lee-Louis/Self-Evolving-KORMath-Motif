@@ -4,6 +4,8 @@
 복제 커밋: `c360cabf8d733a82455565358b3dc965aab9ba8d`  
 라이선스: 데이터셋 카드에 MIT로 표시됨
 
+`HRM8K/`는 위 커밋의 데이터 스냅샷으로, IEPBL 저장소에서 직접 추적합니다.
+
 | 원본 파일 | 행 수 | SHA-256 |
 | --- | ---: | --- |
 | `HRM8K/HRM8K/gsm8k_test.csv` | 1,319 | `e603ccfec40beaba66b0ae7f46fe400ed3a02d892b8622a5097a2bee2eb7e05f` |

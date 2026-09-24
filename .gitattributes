@@ -5,3 +5,4 @@
 *.toml text eol=lf
 .gitmodules text eol=lf
 .env.example text eol=lf
+datasets/HRM8K/HRM8K/*.csv -text
