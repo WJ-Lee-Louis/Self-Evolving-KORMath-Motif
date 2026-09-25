@@ -6,13 +6,14 @@
 
 | 파일 | 역할 |
 | --- | --- |
-| `config.json` | 모델 ID·API 주소·풀이와 reflection의 개별 출력 한도, 난수 시드, GEPA 및 모델 호출 예산, 분할 파일 해시 |
+| `config.json` | 모델 ID·API 주소·풀이와 reflection의 개별 출력 한도, 난수 시드, GEPA 및 모델 호출 예산, 분할 파일 해시, 미니배치 추출 방식·난이도별 비율 |
 | `run_manifest.json` | 실행 시각, GEPA 커밋(알 수 있으면), GEPA·프로젝트 핵심 코드 해시, Python 환경, 입력·코드 사본 경로와 해시. API 키는 기록하지 않음 |
 | `inputs/train.jsonl`, `inputs/val.jsonl` | GEPA가 실제로 읽은 문항의 바이트 단위 사본. 순서와 문항 ID를 보존 |
 | `inputs/seed_ko.md`, `inputs/reflection_ko.md` | 초기 시스템 프롬프트와 reflection 템플릿 원본 사본 |
 | `inputs/code/` | 실행에 사용한 프로젝트·GEPA 핵심 Python 파일의 사본. 나중에 코드가 바뀌어도 당시 구현을 읽을 수 있음 |
 | `run_sessions.jsonl`, `run_status.json` | 프로세스별 시작·완료·중단, 호출 수와 현재 실행 상태. 재개 시 세션이 추가됨 |
-| `api_requests.jsonl` | 실제 풀이·reflection 호출마다 역할, 모델에 보낸 메시지 전문과 응답, 해시, 소요 시간, 제공된 경우 API 응답 ID·토큰 사용량·종료 사유·오류 상태를 기록. 키는 제외 |
+| `api_requests.jsonl` | 풀이·reflection 논리 호출마다 역할, 모델에 보낸 메시지 전문과 응답, 해시, 소요 시간, 실제 새 API 호출인지 이전 세션의 동일 요청 응답을 재사용했는지 기록. 키는 제외 |
+| `api_calls.json` | 해당 프로세스의 논리 호출·새 제공자 호출·이전 응답 재사용 건수와 호출 상한 |
 
 `run_id`가 같더라도 설정·입력·핵심 코드가 바뀌면 이어서 실행하지 않는다. GEPA 커밋은 양쪽 환경에서 확인할 수 있을 때 추가로 비교한다. `config.json`의 해시와 `run_manifest.json`의 입력 사본을 함께 확인한다. GEPA에 전달하는 문항 레코드에는 `additional_context.question_id`를 메타데이터로 실어 궤적과 원본 문항을 잇는다. 이 필드는 모델의 사용자 메시지에는 추가되지 않는다.
 
@@ -29,6 +30,8 @@
 | `iterations/<iteration_id>/val_scores.json`, `outputs/`, `trajectories/` | **채택 후보에만** 생성되는 문항별 검증 점수·응답·궤적 |
 
 초기 후보는 `iterations/seed/`와 `candidate_idx=0`이다. `events.jsonl`의 `minibatch_evaluation` 및 `attempt.json`의 훈련 묶음 점수는 **train 문항의 중간 평가**다. `validation.jsonl`의 `average_score`와 `val_scores.json`은 **val 문항의 전체 평가**다. 거절 제안은 원본 GEPA 절차상 val 전체를 평가하지 않으므로 `val_accuracy=null`로 표시한다. `test_*` 문항은 이 단계에 사용하지 않는다.
+
+Omni-MATH의 `minibatch` 이벤트에는 `difficulty_bins_by_question_id`가 포함된다. 실제 1:3:1 추출 여부를 `train_ids`와 함께 확인할 수 있다. 재실행 시 필요한 추출기 버전·난이도별 정원·시드와 train 파일 해시는 `config.json` 및 `run_manifest.json`에 기록된다.
 
 ## 계보와 사후 분석 파일
 
@@ -48,6 +51,8 @@
 중단된 실행을 재개할 때 GEPA가 저장된 초기 후보 점수를 다시 callback으로 알리면 `validation.jsonl`에 초기 후보 행이 다시 나타날 수 있다. 이 행을 새 모델 호출로 세지 않는다. 실제 호출은 `api_requests.jsonl`과 `run_sessions.jsonl`로 확인하고, 후보별 최종 점수는 `gepa_result.json` 및 `audit.json`과 대조한다.
 
 `api_requests.jsonl`의 풀이 호출에는 `question_matches`가 있다. 실제 사용자 메시지와 일치하는 train·val 문항 ID를 배열로 담으므로, 동일한 문제 텍스트가 여러 행에 있으면 후보 ID를 임의로 하나만 고르지 않는다. `system_prompt_sha256`으로 요청 당시 후보 프롬프트와 `lineage.json`의 프롬프트 해시를 연결할 수 있다. 응답 메타데이터의 `requested_max_completion_tokens`와 `finish_reason`으로 역할별 출력 한도와 응답 잘림 여부를 점검한다.
+
+Modal 재시도 시 이전 세션에서 성공한 동일 요청의 `prompt_sha256`을 발견하면 저장된 응답을 다시 사용하고 `served_from_prior_session=true`로 표시한다. 일반 실행 중 같은 프롬프트가 다시 나오면 새 API 호출을 하므로, 이 재사용은 **중단 후 복구**에만 적용된다. API 로그는 새 성공 응답 5회마다 Volume에 commit한다. 마지막 commit 이후 기록은 재시도에서 다시 호출될 수 있다.
 
 ## 보류 평가 기록
 

@@ -17,9 +17,9 @@ class Settings:
     api_key: str
     base_url: str = DEFAULT_BASE_URL
     model: str = DEFAULT_MODEL
-    timeout_seconds: float = 60.0
+    timeout_seconds: float = 1800.0
     temperature: float = 0.0
-    max_output_tokens: int = 2048
+    max_output_tokens: int = 16384
     reflection_max_output_tokens: int = 4096
 
     @classmethod
@@ -29,13 +29,13 @@ class Settings:
         if require_key and not key:
             raise ValueError("INFRON_API_KEY가 없습니다. .env 파일 또는 환경 변수에 설정하세요.")
 
-        timeout = float(os.getenv("MOTIF_TIMEOUT_SECONDS", "60"))
+        timeout = float(os.getenv("MOTIF_TIMEOUT_SECONDS", "1800"))
         if timeout <= 0:
             raise ValueError("MOTIF_TIMEOUT_SECONDS는 0보다 커야 합니다.")
         temperature = float(os.getenv("MOTIF_TEMPERATURE", "0"))
         if not 0 <= temperature <= 2:
             raise ValueError("MOTIF_TEMPERATURE는 0에서 2 사이여야 합니다.")
-        max_output_tokens = int(os.getenv("MOTIF_MAX_OUTPUT_TOKENS", "2048"))
+        max_output_tokens = int(os.getenv("MOTIF_MAX_OUTPUT_TOKENS", "16384"))
         if max_output_tokens < 1:
             raise ValueError("MOTIF_MAX_OUTPUT_TOKENS는 1 이상이어야 합니다.")
         reflection_max_output_tokens = int(os.getenv("MOTIF_REFLECTION_MAX_OUTPUT_TOKENS", "4096"))

@@ -19,6 +19,7 @@ from motif_gepa_ko.artifacts import (
 from motif_gepa_ko.data import as_gepa_data, load_split
 from motif_gepa_ko.gepa_setup import load_prompt_assets
 from motif_gepa_ko.model import MotifLM
+from motif_gepa_ko.sampling import OmniStratifiedBatchSampler, SAMPLER_NAME
 from motif_gepa_ko.scoring import KoreanMathEvaluator, score_response
 from motif_gepa_ko.settings import PROJECT_ROOT, Settings
 
@@ -42,14 +43,27 @@ class CountedLM:
 
     def __init__(self, lm: MotifLM, max_calls: int, *, log_path: Path | None = None,
                  session_id: str | None = None,
-                 question_lookup: dict[str, list[dict]] | None = None):
+                 question_lookup: dict[str, list[dict]] | None = None,
+                 checkpoint_hook: Callable[[], None] | None = None):
         self.lm = lm
         self.max_calls = max_calls
         self.calls = 0
+        self.provider_calls = 0
+        self.replayed_calls = 0
         self.log_path = log_path
         self.session_id = session_id
         self.context: dict[str, Any] = {}
         self.question_lookup = question_lookup or {}
+        self.checkpoint_hook = checkpoint_hook
+        self.completed_since_checkpoint = 0
+        # Only calls saved by an earlier process are replayed. Calls within
+        # this process still reach the model, preserving normal GEPA behavior.
+        self.prior_responses = {
+            row["prompt_sha256"]: row["response"]
+            for row in (read_jsonl(log_path) if log_path is not None else [])
+            if row.get("status") == "success" and isinstance(row.get("response"), str)
+            and isinstance(row.get("prompt_sha256"), str)
+        }
 
     def __call__(self, prompt: Any) -> str:
         if self.calls >= self.max_calls:
@@ -62,6 +76,8 @@ class CountedLM:
             "logical_call_number": self.calls,
             "started_at_utc": utc_now(),
             "role": "reflection" if isinstance(prompt, str) else "task",
+            "timeout_seconds": getattr(getattr(self.lm, "settings", None), "timeout_seconds", None),
+            "sdk_max_retries": 2,
             "request": prompt,
             "prompt_sha256": sha256_text(json.dumps(prompt, ensure_ascii=False, default=str)),
             **self.context,
@@ -72,7 +88,15 @@ class CountedLM:
             record["question_matches"] = self.question_lookup.get(user_text, []) if isinstance(user_text, str) else []
             record["system_prompt_sha256"] = sha256_text(system_text) if isinstance(system_text, str) else None
         try:
-            response = self.lm(prompt)
+            cached = self.prior_responses.get(record["prompt_sha256"])
+            if cached is not None:
+                response = cached
+                self.replayed_calls += 1
+                record["served_from_prior_session"] = True
+            else:
+                self.provider_calls += 1
+                response = self.lm(prompt)
+                record["served_from_prior_session"] = False
             record.update({
                 "status": "success", "response": response,
                 "response_sha256": sha256_text(response),
@@ -89,6 +113,15 @@ class CountedLM:
             record["response_metadata"] = getattr(self.lm, "last_response_metadata", None)
             if self.log_path is not None:
                 append_jsonl(self.log_path, record)
+            if (
+                self.checkpoint_hook is not None
+                and record.get("status") == "success"
+                and not record.get("served_from_prior_session", False)
+            ):
+                self.completed_since_checkpoint += 1
+                if self.completed_since_checkpoint >= 5:
+                    self.checkpoint_hook()
+                    self.completed_since_checkpoint = 0
 
 
 class EvolutionLog:
@@ -98,6 +131,7 @@ class EvolutionLog:
         train_ids: list[str],
         val_ids: list[str],
         checkpoint_hook: Callable[[], None] | None = None,
+        train_difficulty_bins: dict[str, str] | None = None,
     ):
         self.run_dir = run_dir
         self.path = run_dir / "events.jsonl"
@@ -105,6 +139,7 @@ class EvolutionLog:
         self.train_ids = train_ids
         self.val_ids = val_ids
         self.checkpoint_hook = checkpoint_hook
+        self.train_difficulty_bins = train_difficulty_bins or {}
         self.session_id = uuid4().hex
         self.sequence = 0
         self.iteration_ids: dict[int, str] = {}
@@ -159,10 +194,15 @@ class EvolutionLog:
 
     def on_minibatch_sampled(self, event: dict) -> None:
         positions = event["minibatch_ids"]
+        question_ids = [self.train_ids[int(i)] for i in positions]
         self._append("minibatch", {
             "iteration": event["iteration"],
             "train_positions": positions,
-            "train_ids": [self.train_ids[int(i)] for i in positions],
+            "train_ids": question_ids,
+            "difficulty_bins_by_question_id": {
+                question_id: self.train_difficulty_bins[question_id]
+                for question_id in question_ids if question_id in self.train_difficulty_bins
+            },
         })
 
     def on_evaluation_end(self, event: dict) -> None:
@@ -484,6 +524,7 @@ def optimize_run(
     minibatch_size: int = 3,
     seed: int = 0,
     checkpoint_hook: Callable[[], None] | None = None,
+    batch_sampling: str = "auto",
 ) -> dict:
     train_records = load_split(data_dir, "train")
     val_records = load_split(data_dir, "val")
@@ -491,6 +532,25 @@ def optimize_run(
         raise ValueError("예산 조건: max_metric_calls >= val 크기, max_api_calls >= max_metric_calls, minibatch_size >= 1")
     if {r["id"] for r in train_records} & {r["id"] for r in val_records}:
         raise ValueError("train과 val에 같은 문항이 있습니다.")
+    omni_flags = [record.get("source_subset") == "OMNI-MATH" for record in train_records]
+    if any(omni_flags) and not all(omni_flags):
+        raise ValueError("Omni-MATH와 다른 데이터셋이 train에 섞여 있습니다.")
+    is_omni = all(omni_flags)
+    if batch_sampling not in {"auto", "epoch_shuffled", SAMPLER_NAME}:
+        raise ValueError(f"알 수 없는 배치 추출 방식: {batch_sampling}")
+    resolved_sampling = (
+        SAMPLER_NAME if is_omni else "epoch_shuffled"
+    ) if batch_sampling == "auto" else batch_sampling
+    if resolved_sampling == SAMPLER_NAME:
+        if not is_omni or minibatch_size != 5:
+            raise ValueError("Omni 1:3:1 추출은 Omni-MATH train과 --minibatch-size 5가 필요합니다.")
+        sampler = OmniStratifiedBatchSampler(train_records, seed)
+        sampler_config = sampler.describe()
+    else:
+        sampler = None
+        sampler_config = {
+            "name": "epoch_shuffled", "minibatch_size": minibatch_size, "seed": seed,
+        }
     settings = Settings.from_env()
     seed_prompt, reflection_prompt = load_prompt_assets(prompts_dir)
     run_dir = _run_path(runs_dir, run_id)
@@ -507,6 +567,7 @@ def optimize_run(
         "max_metric_calls": max_metric_calls,
         "max_api_calls": max_api_calls,
         "minibatch_size": minibatch_size,
+        "batch_sampling": sampler_config,
         "seed": seed,
         "train_count": len(train_records),
         "val_count": len(val_records),
@@ -548,6 +609,7 @@ def optimize_run(
     recorder = EvolutionLog(
         run_dir, [record["id"] for record in train_records],
         [record["id"] for record in val_records], checkpoint_hook,
+        {record["id"]: record["difficulty_bin"] for record in train_records} if is_omni else None,
     )
     question_lookup: dict[str, list[dict]] = {}
     for split_name, records in (("train", train_records), ("val", val_records)):
@@ -555,7 +617,7 @@ def optimize_run(
             question_lookup.setdefault(record["question"], []).append({"split": split_name, "id": record["id"]})
     lm = CountedLM(MotifLM(settings), max_api_calls,
                    log_path=run_dir / "api_requests.jsonl", session_id=recorder.session_id,
-                   question_lookup=question_lookup)
+                   question_lookup=question_lookup, checkpoint_hook=checkpoint_hook)
     session_path = run_dir / "run_sessions.jsonl"
     append_jsonl(session_path, {
         "session_id": recorder.session_id, "event": "started", "at_utc": utc_now(),
@@ -573,7 +635,11 @@ def optimize_run(
             evaluator=KoreanMathEvaluator(),
             reflection_lm=lm,
             reflection_prompt_template=reflection_prompt,
-            reflection_minibatch_size=minibatch_size,
+            **(
+                {"batch_sampler": sampler}
+                if sampler is not None
+                else {"reflection_minibatch_size": minibatch_size}
+            ),
             max_metric_calls=max_metric_calls,
             seed=seed,
             run_dir=str(run_dir),
@@ -594,7 +660,10 @@ def optimize_run(
         })
         raise
     finally:
-        _write_json(run_dir / "api_calls.json", {"logical_calls_this_process": lm.calls, "limit": max_api_calls})
+        _write_json(run_dir / "api_calls.json", {
+            "logical_calls_this_process": lm.calls, "provider_calls_this_process": lm.provider_calls,
+            "replayed_calls_this_process": lm.replayed_calls, "limit": max_api_calls,
+        })
     append_jsonl(session_path, {
         "session_id": recorder.session_id, "event": "optimization_finished", "at_utc": utc_now(),
         "logical_api_calls": lm.calls, "gepa_metric_calls": result.total_metric_calls,

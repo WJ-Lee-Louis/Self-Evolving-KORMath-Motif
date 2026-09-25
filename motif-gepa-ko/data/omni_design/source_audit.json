@@ -1,0 +1,376 @@
+{
+  "source_file": "datasets/HRM8K/HRM8K/omni-math_do_test.csv",
+  "source_sha256": "70e7264b5d0813a7f965ea84485bd5b0d339d72358e901dad87c594551936547",
+  "source_rows": 1909,
+  "difficulty_counts": {
+    "1.0": 81,
+    "1.5": 133,
+    "2.0": 124,
+    "2.25": 3,
+    "2.5": 125,
+    "3.0": 14,
+    "3.5": 104,
+    "3.75": 1,
+    "4.0": 295,
+    "4.375": 1,
+    "4.5": 192,
+    "4.75": 6,
+    "5.0": 459,
+    "5.25": 121,
+    "5.5": 51,
+    "6.0": 63,
+    "6.25": 2,
+    "6.5": 12,
+    "7.0": 52,
+    "7.5": 5,
+    "8.0": 34,
+    "8.5": 1,
+    "9.0": 26,
+    "9.5": 4
+  },
+  "manual_quality_flags": {
+    "exclude_visual_reference": 39,
+    "exclude_nonexact_scoring": 25,
+    "exclude_external_information": 9,
+    "exclude_answer_leak": 1,
+    "exclude_malformed_question": 1
+  },
+  "manual_quality_flag_source_row_indices": [
+    104,
+    133,
+    149,
+    161,
+    163,
+    219,
+    281,
+    288,
+    292,
+    311,
+    398,
+    432,
+    470,
+    495,
+    559,
+    596,
+    626,
+    633,
+    652,
+    660,
+    670,
+    737,
+    745,
+    763,
+    775,
+    785,
+    804,
+    815,
+    823,
+    837,
+    843,
+    866,
+    893,
+    901,
+    916,
+    952,
+    1015,
+    1081,
+    1123,
+    1152,
+    1163,
+    1164,
+    1184,
+    1199,
+    1227,
+    1241,
+    1244,
+    1247,
+    1251,
+    1252,
+    1257,
+    1273,
+    1287,
+    1292,
+    1391,
+    1405,
+    1412,
+    1417,
+    1425,
+    1464,
+    1493,
+    1501,
+    1506,
+    1510,
+    1558,
+    1572,
+    1599,
+    1618,
+    1647,
+    1689,
+    1692,
+    1703,
+    1719,
+    1729,
+    1822
+  ],
+  "duplicate_groups_by_exact_normalized_english_original": [
+    {
+      "source_row_indices": [
+        1358,
+        1624
+      ],
+      "answers": [
+        "11",
+        "11"
+      ],
+      "difficulties": [
+        "2.5",
+        "1.5"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1361,
+        1396
+      ],
+      "answers": [
+        "6",
+        "6"
+      ],
+      "difficulties": [
+        "1.0",
+        "1.0"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1362,
+        1507
+      ],
+      "answers": [
+        "5",
+        "5"
+      ],
+      "difficulties": [
+        "2.5",
+        "2.5"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1412,
+        1464
+      ],
+      "answers": [
+        "20",
+        "20"
+      ],
+      "difficulties": [
+        "2.5",
+        "2.0"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1441,
+        1671
+      ],
+      "answers": [
+        "11",
+        "11"
+      ],
+      "difficulties": [
+        "3.0",
+        "1.5"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1443,
+        1457
+      ],
+      "answers": [
+        "32",
+        "32"
+      ],
+      "difficulties": [
+        "2.0",
+        "1.5"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1467,
+        1630
+      ],
+      "answers": [
+        "7",
+        "7"
+      ],
+      "difficulties": [
+        "1.0",
+        "1.0"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1472,
+        1514
+      ],
+      "answers": [
+        "25",
+        "25"
+      ],
+      "difficulties": [
+        "2.0",
+        "1.0"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1473,
+        1476
+      ],
+      "answers": [
+        "2",
+        "2"
+      ],
+      "difficulties": [
+        "2.0",
+        "2.0"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1475,
+        1483
+      ],
+      "answers": [
+        "5",
+        "5"
+      ],
+      "difficulties": [
+        "1.5",
+        "1.0"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1480,
+        1593
+      ],
+      "answers": [
+        "44",
+        "44"
+      ],
+      "difficulties": [
+        "1.5",
+        "1.5"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1492,
+        1504
+      ],
+      "answers": [
+        "2019",
+        "2019"
+      ],
+      "difficulties": [
+        "1.5",
+        "2.0"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1500,
+        1552
+      ],
+      "answers": [
+        "26",
+        "26"
+      ],
+      "difficulties": [
+        "1.5",
+        "1.5"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1502,
+        1505
+      ],
+      "answers": [
+        "109",
+        "109"
+      ],
+      "difficulties": [
+        "1.0",
+        "1.5"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1541,
+        1617
+      ],
+      "answers": [
+        "31",
+        "31"
+      ],
+      "difficulties": [
+        "1.5",
+        "1.5"
+      ]
+    },
+    {
+      "source_row_indices": [
+        1737,
+        1761
+      ],
+      "answers": [
+        "5",
+        "5"
+      ],
+      "difficulties": [
+        "1.5",
+        "1.5"
+      ]
+    }
+  ],
+  "duplicate_groups_by_exact_normalized_korean_question": [
+    [
+      1467,
+      1630
+    ]
+  ],
+  "exact_cross_source_matches": {
+    "MATH": [
+      {
+        "omni_source_row_index": 478,
+        "other_source_row_indices": [
+          2816
+        ]
+      }
+    ],
+    "GSM8K": []
+  },
+  "exact_cross_source_korean_matches": {
+    "MATH": [],
+    "GSM8K": []
+  },
+  "exact_cross_with_existing_math_ood_holdout": [
+    {
+      "omni_source_row_index": 478,
+      "other_source_row_indices": [
+        2816
+      ]
+    }
+  ],
+  "final_split_manifest": "data/omni_v1/manifest.json",
+  "limitations": [
+    "Rule-assisted manual visual review is not a guarantee that every malformed item was found.",
+    "Exact normalized text matching does not detect paraphrases or translated overlaps.",
+    "The generated split manifest is the authoritative count after exclusions and deduplication."
+  ]
+}

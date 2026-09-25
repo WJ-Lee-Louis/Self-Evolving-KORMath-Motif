@@ -1,0 +1,76 @@
+source_row_index,decision,reason
+104,exclude_visual_reference,missing grid illustration
+133,exclude_nonexact_scoring,estimate with partial-credit scoring
+149,exclude_nonexact_scoring,estimate with partial-credit scoring
+161,exclude_nonexact_scoring,estimate with partial-credit scoring
+163,exclude_nonexact_scoring,estimate with partial-credit scoring
+219,exclude_external_information,requires historical contest responses
+281,exclude_external_information,requires historical contest submissions
+288,exclude_nonexact_scoring,estimate with partial-credit scoring
+292,exclude_nonexact_scoring,estimate with partial-credit scoring
+311,exclude_nonexact_scoring,estimate with partial-credit scoring
+398,exclude_nonexact_scoring,estimate with partial-credit scoring
+432,exclude_nonexact_scoring,estimate with partial-credit scoring
+470,exclude_visual_reference,missing brick arrangement
+495,exclude_visual_reference,refers to omitted rectangle drawing
+559,exclude_answer_leak,question includes worked solution and answer
+596,exclude_visual_reference,missing bridge graph
+626,exclude_visual_reference,missing labeled grid
+633,exclude_visual_reference,missing calendar diagram
+652,exclude_visual_reference,figure referenced despite text sufficiency
+660,exclude_nonexact_scoring,estimate with partial-credit scoring
+670,exclude_external_information,requires historical contest results
+737,exclude_visual_reference,missing weighted graph
+745,exclude_nonexact_scoring,estimate with partial-credit scoring
+763,exclude_nonexact_scoring,partial-credit scoring
+775,exclude_nonexact_scoring,estimate with partial-credit scoring
+785,exclude_visual_reference,missing polygon drawing
+804,exclude_external_information,requires historical Google result counts
+815,exclude_external_information,requires other contest questions
+823,exclude_visual_reference,refers to omitted rectangle drawing
+837,exclude_external_information,requires historical authors ages
+843,exclude_nonexact_scoring,estimate with partial-credit scoring
+866,exclude_nonexact_scoring,partial-credit scoring
+893,exclude_visual_reference,missing X pattern example
+901,exclude_nonexact_scoring,partial-credit scoring
+916,exclude_nonexact_scoring,estimate with partial-credit scoring
+952,exclude_nonexact_scoring,estimate with partial-credit scoring
+1015,exclude_visual_reference,missing triangle arrangement
+1081,exclude_nonexact_scoring,partial-credit scoring
+1123,exclude_visual_reference,omitted example illustration
+1152,exclude_nonexact_scoring,partial-credit scoring
+1163,exclude_nonexact_scoring,estimate with partial-credit scoring
+1164,exclude_external_information,requires historical contestant scores
+1184,exclude_visual_reference,missing pixel image
+1199,exclude_nonexact_scoring,estimate with partial-credit scoring
+1227,exclude_external_information,requires external genealogy database
+1241,exclude_nonexact_scoring,estimate with partial-credit scoring
+1244,exclude_visual_reference,missing molecular skeleton
+1247,exclude_nonexact_scoring,estimate with partial-credit scoring
+1251,exclude_visual_reference,missing molecular skeleton
+1252,exclude_visual_reference,missing shaded region
+1257,exclude_external_information,requires historical contest responses
+1273,exclude_visual_reference,missing rectangle drawing
+1287,exclude_visual_reference,missing magic-square placement
+1292,exclude_visual_reference,refers to omitted solid drawing
+1391,exclude_malformed_question,unused T constraint and broken embedded addition markup
+1405,exclude_visual_reference,missing perimeter drawing
+1412,exclude_visual_reference,missing circle-square layout
+1417,exclude_visual_reference,missing grid label placement
+1425,exclude_visual_reference,missing addition layout
+1464,exclude_visual_reference,missing circle-square layout
+1493,exclude_visual_reference,missing tilted rectangle drawing
+1501,exclude_visual_reference,missing graph drawings
+1506,exclude_visual_reference,missing circle placements
+1510,exclude_visual_reference,missing square side lengths
+1558,exclude_visual_reference,missing X placement grid
+1572,exclude_visual_reference,missing triangle arrangement rule
+1599,exclude_visual_reference,missing rhombus arrangement
+1618,exclude_visual_reference,number line referenced despite text sufficiency
+1647,exclude_visual_reference,cube drawing referenced despite text sufficiency
+1689,exclude_visual_reference,missing subtraction layout
+1692,exclude_visual_reference,missing shaded grid
+1703,exclude_nonexact_scoring,requires bound pair and partial-credit scoring
+1719,exclude_visual_reference,missing star number placement
+1729,exclude_visual_reference,missing spinner values
+1822,exclude_visual_reference,missing filled rectangle placement

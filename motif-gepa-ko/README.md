@@ -2,6 +2,8 @@
 
 확정된 HRM8K 데이터 구성과 문항별 분할 규칙은 [데이터 분할 문서](docs/DATA_SPLITS.md)를 참고하세요. 생성된 JSONL과 전체 원본 행 번호 목록은 [`data/hrm8k_v1/`](data/hrm8k_v1/)에 있습니다.
 
+새 한국어 Omni-MATH 진화용 데이터는 그림·비정확 채점·외부 정보 문항을 걸러 [`data/omni_v1/`](data/omni_v1/)에 별도로 구성했습니다. 원본 1,909문항 중 1,818문항을 train 1,272·val 182·test 364로 나눈 기준은 [Omni 분할 문서](docs/OMNI_EVOLUTION_DESIGN.md)를 참고하세요.
+
 이 폴더는 한국어 수학 문제에 대한 **시스템 프롬프트 진화**를 실행합니다. HRM8K 분할, 숫자 채점 규칙, 예비 실행 예산을 고정했습니다. `upstream/gepa` 원본은 수정하지 않습니다.
 
 ## 현재 구성
@@ -55,12 +57,12 @@ Copy-Item .env.example .env
 
 ## GEPA 실행
 
-예비 실험은 아래 명령으로 시작합니다. 보류 평가와 결과 다운로드 방법은 [실험 실행 문서](docs/EXPERIMENT_RUN.md)에 있습니다.
+현재 Omni-MATH 진화 실험은 아래 명령으로 시작합니다. 데이터 분할·1:3:1 미니배치·실행 예산은 [Omni-MATH 실험 설계](docs/OMNI_EVOLUTION_DESIGN.md)에, 결과 다운로드와 기록 확인 방법은 [실험 실행 문서](docs/EXPERIMENT_RUN.md)에 있습니다. 기존 `ko-pilot-01` 명령은 HRM8K/GSM8K 과거 실행 기록이며 다시 사용하지 않습니다.
 
 ```powershell
 $env:PYTHONUTF8 = '1'
 $env:PYTHONIOENCODING = 'utf-8'
-.\.venv\Scripts\modal.exe run --detach .\modal_experiment.py::optimize --run-id ko-pilot-01 --max-metric-calls 180 --max-api-calls 250
+.\.venv\Scripts\modal.exe run --detach .\modal_experiment.py::optimize --dataset omni_v1 --run-id ko-omni-b1200-m5-s0 --minibatch-size 5 --batch-sampling omni_difficulty_1_3_1 --max-metric-calls 1200 --max-api-calls 1800 --seed 0
 ```
 
 채택된 한국어 프롬프트 전문과 줄 단위 차이는 `evolution.md`, 거절을 포함한 모든 제안과 중간 평가는 `attempt_timeline.md`·`iterations/<id>/attempt.json`·`events.jsonl`, 부모·자식 관계는 `lineage.json`에 기록됩니다. 고정 분할은 `.\.venv\Scripts\python.exe .\scripts\prepare_hrm8k_splits.py --check`로 재검증할 수 있습니다.

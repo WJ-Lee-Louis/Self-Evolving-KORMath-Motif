@@ -96,7 +96,7 @@ def code_file_map() -> dict[str, Path]:
         f"motif_gepa_ko/{name}": project_code / name
         for name in (
             "experiment.py", "artifacts.py", "scoring.py", "model.py", "data.py",
-            "settings.py", "gepa_setup.py",
+            "settings.py", "gepa_setup.py", "sampling.py",
         )
     }
     code_files.update({
