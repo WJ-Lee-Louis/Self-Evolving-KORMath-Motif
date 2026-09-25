@@ -11,7 +11,8 @@ volume = modal.Volume.from_name("motif-gepa-ko-runs", create_if_missing=True)
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("openai>=1.0,<3", "python-dotenv>=1.0,<2")
-    .env({"MOTIF_TIMEOUT_SECONDS": "120", "MOTIF_TEMPERATURE": "0", "MOTIF_MAX_OUTPUT_TOKENS": "2048"})
+    .env({"MOTIF_TIMEOUT_SECONDS": "120", "MOTIF_TEMPERATURE": "0", "MOTIF_MAX_OUTPUT_TOKENS": "2048",
+          "MOTIF_REFLECTION_MAX_OUTPUT_TOKENS": "4096"})
     .add_local_python_source("gepa", "motif_gepa_ko")
     .add_local_dir(str(ROOT / "data" / "hrm8k_v1"), remote_path="/workspace/data")
     .add_local_dir(str(ROOT / "prompts"), remote_path="/workspace/prompts")
@@ -45,7 +46,7 @@ def preflight_remote() -> dict:
     }
 
 
-@app.function(image=image, secrets=[secret], volumes={"/results": volume}, timeout=21600, cpu=0.5, memory=1024)
+@app.function(image=image, secrets=[secret], volumes={"/results": volume}, timeout=86400, cpu=0.5, memory=1024)
 def optimize_remote(run_id: str, max_metric_calls: int, max_api_calls: int, minibatch_size: int, seed: int) -> dict:
     from motif_gepa_ko.experiment import optimize_run
 

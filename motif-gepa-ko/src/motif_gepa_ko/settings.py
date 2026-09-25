@@ -20,6 +20,7 @@ class Settings:
     timeout_seconds: float = 60.0
     temperature: float = 0.0
     max_output_tokens: int = 2048
+    reflection_max_output_tokens: int = 4096
 
     @classmethod
     def from_env(cls, *, require_key: bool = True) -> "Settings":
@@ -37,6 +38,9 @@ class Settings:
         max_output_tokens = int(os.getenv("MOTIF_MAX_OUTPUT_TOKENS", "2048"))
         if max_output_tokens < 1:
             raise ValueError("MOTIF_MAX_OUTPUT_TOKENS는 1 이상이어야 합니다.")
+        reflection_max_output_tokens = int(os.getenv("MOTIF_REFLECTION_MAX_OUTPUT_TOKENS", "4096"))
+        if reflection_max_output_tokens < 1:
+            raise ValueError("MOTIF_REFLECTION_MAX_OUTPUT_TOKENS는 1 이상이어야 합니다.")
 
         return cls(
             api_key=key,
@@ -45,4 +49,5 @@ class Settings:
             timeout_seconds=timeout,
             temperature=temperature,
             max_output_tokens=max_output_tokens,
+            reflection_max_output_tokens=reflection_max_output_tokens,
         )

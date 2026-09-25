@@ -6,7 +6,7 @@
 
 | 파일 | 역할 |
 | --- | --- |
-| `config.json` | 모델 ID·API 주소·생성 설정, 난수 시드, GEPA 및 모델 호출 예산, 분할 파일 해시 |
+| `config.json` | 모델 ID·API 주소·풀이와 reflection의 개별 출력 한도, 난수 시드, GEPA 및 모델 호출 예산, 분할 파일 해시 |
 | `run_manifest.json` | 실행 시각, GEPA 커밋(알 수 있으면), GEPA·프로젝트 핵심 코드 해시, Python 환경, 입력·코드 사본 경로와 해시. API 키는 기록하지 않음 |
 | `inputs/train.jsonl`, `inputs/val.jsonl` | GEPA가 실제로 읽은 문항의 바이트 단위 사본. 순서와 문항 ID를 보존 |
 | `inputs/seed_ko.md`, `inputs/reflection_ko.md` | 초기 시스템 프롬프트와 reflection 템플릿 원본 사본 |
@@ -47,7 +47,7 @@
 `validation.jsonl`에는 GEPA 내부의 0부터 시작하는 val 행 번호 대신 **원래 문항 ID**를 키로 쓴다. `val_scores.json`의 `"0"`, `"1"` 등은 `inputs/val.jsonl`의 행 번호로 해석한다. `audit.json`은 두 표현의 점수와 GEPA 결과가 같은지 확인한다.
 중단된 실행을 재개할 때 GEPA가 저장된 초기 후보 점수를 다시 callback으로 알리면 `validation.jsonl`에 초기 후보 행이 다시 나타날 수 있다. 이 행을 새 모델 호출로 세지 않는다. 실제 호출은 `api_requests.jsonl`과 `run_sessions.jsonl`로 확인하고, 후보별 최종 점수는 `gepa_result.json` 및 `audit.json`과 대조한다.
 
-`api_requests.jsonl`의 풀이 호출에는 `question_matches`가 있다. 실제 사용자 메시지와 일치하는 train·val 문항 ID를 배열로 담으므로, 동일한 문제 텍스트가 여러 행에 있으면 후보 ID를 임의로 하나만 고르지 않는다. `system_prompt_sha256`으로 요청 당시 후보 프롬프트와 `lineage.json`의 프롬프트 해시를 연결할 수 있다.
+`api_requests.jsonl`의 풀이 호출에는 `question_matches`가 있다. 실제 사용자 메시지와 일치하는 train·val 문항 ID를 배열로 담으므로, 동일한 문제 텍스트가 여러 행에 있으면 후보 ID를 임의로 하나만 고르지 않는다. `system_prompt_sha256`으로 요청 당시 후보 프롬프트와 `lineage.json`의 프롬프트 해시를 연결할 수 있다. 응답 메타데이터의 `requested_max_completion_tokens`와 `finish_reason`으로 역할별 출력 한도와 응답 잘림 여부를 점검한다.
 
 ## 보류 평가 기록
 
@@ -55,7 +55,7 @@
 
 ## 중단과 감사의 범위
 
-GEPA 상태는 반복 사이와 정상 종료 시 저장된다. Modal에서는 상태 저장·반복 종료·함수 종료 시 Volume을 commit한다. 강제 종료가 진행 중인 한 반복을 끊으면 마지막 commit 이후 이벤트나 미완료 평가가 빠질 수 있다. 재실행 시 `run_log.json`과 일치하는 반복이 **확정된 타임라인**이며, 이전 시도에서 남은 다른 `iterations/` 디렉터리는 복구 가능한 참고 기록이다. `run_status.json`이 `complete`이고 `audit.json`의 `passed`가 `true`일 때만 완전한 실행 결과로 취급한다.
+GEPA 상태는 반복 사이와 정상 종료 시 저장된다. Modal에서는 상태 저장·반복 종료·함수 종료 시 Volume을 commit한다. 강제 종료가 진행 중인 한 반복을 끊으면 마지막 commit 이후 이벤트나 미완료 평가가 빠질 수 있다. 오류가 callback으로 전달된 반복은 `attempt.json`의 `decision=interrupted`, 미완료 제안은 `decision=evaluation_incomplete`로 기록하고 성능에 따른 거절과 구분한다. 재실행 시 `run_log.json`과 일치하는 반복이 **확정된 타임라인**이며, 이전 시도에서 남은 다른 `iterations/` 디렉터리는 복구 가능한 참고 기록이다. `run_status.json`이 `complete`이고 `audit.json`의 `passed`가 `true`일 때만 완전한 실행 결과로 취급한다.
 
 `audit.json`은 파일 존재, 해시, 후보·부모 연결, 전체 val 문항별 점수와 반복 요약의 일치 여부를 검사한다. 이 검사가 통과해도 모델 응답의 통계적 재현성이나 프롬프트 개선의 유의성을 보증하지는 않는다. 성능 주장은 별도로 보류 `test_*` 비교를 완료한 뒤 제시한다.
 다운로드한 실행도 `python -m motif_gepa_ko.cli audit --run-dir <실행 폴더>`로 같은 검사를 다시 할 수 있다. 이 명령은 API 키와 모델 호출을 사용하지 않는다.

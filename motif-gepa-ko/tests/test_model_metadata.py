@@ -12,6 +12,26 @@ from motif_gepa_ko.settings import Settings
 
 
 class ModelMetadataTests(unittest.TestCase):
+    def test_reflection_has_its_own_output_limit(self):
+        requests = []
+        response = SimpleNamespace(
+            id="completion-1", _request_id="request-1", model="motif/motif-3",
+            created=123, system_fingerprint="fp", usage=None,
+            choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content="새 지침"))],
+        )
+
+        def create(**kwargs):
+            requests.append(kwargs)
+            return response
+
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+        lm = MotifLM(Settings(api_key="private-key"), client=client)
+        lm([{"role": "user", "content": "문제"}])
+        self.assertEqual(lm.last_response_metadata["requested_max_completion_tokens"], 2048)
+        lm("반성 입력")
+        self.assertEqual(lm.last_response_metadata["requested_max_completion_tokens"], 4096)
+        self.assertEqual([request["max_completion_tokens"] for request in requests], [2048, 4096])
+
     def test_request_and_usage_are_logged_without_key(self):
         response = SimpleNamespace(
             id="completion-1", _request_id="request-1", model="motif/motif-3",

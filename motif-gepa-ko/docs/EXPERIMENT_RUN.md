@@ -16,7 +16,7 @@ $env:PYTHONIOENCODING = 'utf-8'
 
 원격 사전 점검은 GEPA, 프롬프트, train 240개·val 60개를 확인하며 모델 API는 호출하지 않는다.
 
-풀이와 reflection에는 `temperature=0`, 응답당 최대 2,048토큰을 사용한다. Modal의 요청 제한 시간은 120초다. 로컬 `.env`를 이전 예시에서 복사했다면 `MOTIF_TIMEOUT_SECONDS=60`일 수 있으므로 로컬 장시간 실행 전 120으로 조정한다. 인프론의 Motif 3 무료 제공은 앞서 확인한 공지상 **2026년 9월 29일까지**이므로 실행 직전에 모델 요금과 계정 한도를 다시 확인한다.
+풀이와 reflection에는 `temperature=0`을 사용한다. 풀이 출력 한도는 2,048토큰이고, reflection 출력 한도는 4,096토큰이다. 예비 실행에서는 두 역할 모두 2,048토큰이었다. 모델 API 요청 제한 시간은 120초다. 로컬 `.env`를 이전 예시에서 복사했다면 `MOTIF_TIMEOUT_SECONDS=60`일 수 있으므로 로컬 장시간 실행 전 120으로 조정한다. 인프론의 Motif 3 무료 제공은 앞서 확인한 공지상 **2026년 9월 29일까지**이므로 실행 직전에 모델 요금과 계정 한도를 다시 확인한다.
 
 ## 진화 실행
 
@@ -28,7 +28,17 @@ $env:PYTHONIOENCODING = 'utf-8'
 .\.venv\Scripts\modal.exe run --detach .\modal_experiment.py::optimize --run-id ko-pilot-01 --max-metric-calls 180 --max-api-calls 250 --minibatch-size 3 --seed 0
 ```
 
-`--detach`를 사용하면 로컬 터미널이나 컴퓨터를 종료해도 원격 함수는 계속 실행된다. Modal 함수 제한은 진화에 6시간, 보류 평가에 24시간으로 설정했다. 중간 상태는 `motif-gepa-ko-runs` Volume에 저장되며, GEPA가 상태를 저장할 때·각 반복이 끝날 때·함수가 종료될 때 명시적으로 commit한다. 강제 종료 시 저장·commit 이후 진행 중이던 한 반복의 일부 기록은 남지 않을 수 있다. 각 `run-id`는 실험 설정을 고정한다. 같은 ID로 설정을 바꾸면 오류가 나므로 새로운 ID를 사용한다.
+`--detach`를 사용하면 로컬 터미널이나 컴퓨터를 종료해도 원격 함수는 계속 실행된다. Modal 함수 제한은 진화와 보류 평가 모두 24시간으로 설정했다. 중간 상태는 `motif-gepa-ko-runs` Volume에 저장되며, GEPA가 상태를 저장할 때·각 반복이 끝날 때·함수가 종료될 때 명시적으로 commit한다. 강제 종료 시 저장·commit 이후 진행 중이던 한 반복의 일부 기록은 남지 않을 수 있다. 각 `run-id`는 실험 설정을 고정한다. 같은 ID로 설정을 바꾸면 오류가 나므로 새로운 ID를 사용한다.
+
+### 긴 진화 실행: 1,200회 예산·훈련 묶음 5문항
+
+예비 실행과 같은 train 240문항·val 60문항, 초기 프롬프트, 난수 시드 0을 사용하고 새 실행 ID에서 처음부터 탐색한다. 한 반복에서 부모 프롬프트로 훈련 문제 5개를 풀며, 제안이 생기면 같은 5개로 다시 평가한다. 전체 val 60문항 평가는 제안이 훈련 묶음 심사를 통과한 경우에만 수행한다. 이 설정은 예비 실행과 예산과 묶음 크기가 모두 다르므로 진화 경로 차이를 한 변수의 효과로 해석하지 않는다.
+
+```powershell
+.\.venv\Scripts\modal.exe run --detach .\modal_experiment.py::optimize --run-id ko-main-b1200-m5-s0 --max-metric-calls 1200 --max-api-calls 1800 --minibatch-size 5 --seed 0
+```
+
+`max-api-calls`는 풀이와 reflection을 합한 한 프로세스의 안전 상한이며, GEPA 평가 예산 1,200회와 다르다. 실제 평가 수는 마지막 반복만큼 1,200회를 넘을 수 있다. 실행 종료 후 `run_status.json`의 `phase=complete`, `audit.json`의 `passed=true`를 확인하고 전체 기록을 내려받는다. `lineage.json`과 `attempt_timeline.md`에서 부모·자식 계보와 중단 시도를 구분해 분석한다. 현재 코드에서 오류로 미완료된 시도는 `decision=interrupted`, 해당 제안은 `decision=evaluation_incomplete`로 기록한다. 보류 `test_*` 평가는 이 실행의 최종 후보를 확정한 뒤에만 진행한다.
 
 ### 로컬에서 실행하기
 

@@ -13,6 +13,31 @@ from motif_gepa_ko.settings import Settings
 
 
 class EvolutionLogTests(unittest.TestCase):
+    def test_error_during_proposal_is_not_recorded_as_rejection(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            log = EvolutionLog(root, ["train-a"], ["val-a"])
+            log.iteration_ids[1] = "interrupted-trial"
+            log.on_proposal_end({
+                "iteration": 1, "new_instructions": {"system_prompt": "새 지침"},
+                "prompts": {}, "raw_lm_outputs": {},
+            })
+            log.on_error({"iteration": 1, "exception": TimeoutError("timeout"), "will_continue": False})
+            log.on_iteration_end({
+                "iteration": 1, "proposal_accepted": False,
+                "state": SimpleNamespace(
+                    full_program_trace=[{"iteration_id": "interrupted-trial", "selected_program_candidate": 0}],
+                    total_num_evals=1, program_candidates=[{"system_prompt": "초기"}],
+                    parent_program_for_candidate=[[None]], iteration_ids_by_candidate_idx=["seed"],
+                    prog_candidate_val_subscores=[{0: 1.0}],
+                    get_program_average_val_subset=lambda _idx: (1.0, 1),
+                ),
+            })
+            attempt = json.loads((root / "iterations" / "interrupted-trial" / "attempt.json").read_text(encoding="utf-8"))
+            self.assertEqual(attempt["decision"], "interrupted")
+            self.assertEqual(attempt["error_type"], "TimeoutError")
+            self.assertEqual(attempt["proposals"][0]["decision"], "evaluation_incomplete")
+
     def test_validation_and_rejection_are_distinct(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

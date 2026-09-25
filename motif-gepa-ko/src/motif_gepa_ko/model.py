@@ -23,8 +23,9 @@ class MotifLM:
 
     def __call__(self, prompt: str | Sequence[Mapping[str, Any]]) -> str:
         self.last_response_metadata = None
+        is_reflection = isinstance(prompt, str)
         messages: list[dict[str, Any]]
-        if isinstance(prompt, str):
+        if is_reflection:
             messages = [{"role": "user", "content": prompt}]
         else:
             messages = [dict(message) for message in prompt]
@@ -33,7 +34,9 @@ class MotifLM:
             model=self.settings.model,
             messages=messages,
             temperature=self.settings.temperature,
-            max_completion_tokens=self.settings.max_output_tokens,
+            max_completion_tokens=(
+                self.settings.reflection_max_output_tokens if is_reflection else self.settings.max_output_tokens
+            ),
             extra_body={"usage": {"include": True}},
         )
         usage = getattr(response, "usage", None)
@@ -44,6 +47,9 @@ class MotifLM:
             "created": getattr(response, "created", None),
             "system_fingerprint": getattr(response, "system_fingerprint", None),
             "finish_reason": response.choices[0].finish_reason if response.choices else None,
+            "requested_max_completion_tokens": (
+                self.settings.reflection_max_output_tokens if is_reflection else self.settings.max_output_tokens
+            ),
             "usage": usage.model_dump(mode="json") if hasattr(usage, "model_dump") else usage,
         }
         if not response.choices:

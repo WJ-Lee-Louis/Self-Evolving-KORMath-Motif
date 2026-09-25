@@ -248,6 +248,8 @@ class EvolutionLog:
         iteration_dir.mkdir(parents=True, exist_ok=True)
         _write_json(iteration_dir / "trace.json", trace)
         records = self.iteration_events.pop(iteration, [])
+        error_events = [item for item in records if item["event"] == "error"]
+        interrupted = bool(error_events)
         parent_idx = trace.get("selected_program_candidate")
         accepted_indices = list(trace.get("new_program_indices") or [])
         if not accepted_indices and trace.get("new_program_idx") is not None:
@@ -274,7 +276,9 @@ class EvolutionLog:
                 "candidate": proposal["candidate"],
                 "prompt_sha256": proposal["prompt_sha256"],
                 "prompt_diff": diff,
-                "decision": "accepted" if matching is not None else "not_added_to_candidate_pool",
+                "decision": "accepted" if matching is not None else (
+                    "evaluation_incomplete" if interrupted else "not_added_to_candidate_pool"
+                ),
                 "child_candidate_idx": matching,
                 "child_iteration_id": state.iteration_ids_by_candidate_idx[matching] if matching is not None else None,
                 "val_accuracy": state.get_program_average_val_subset(matching)[0] if matching is not None else None,
@@ -298,7 +302,10 @@ class EvolutionLog:
             "iteration": iteration,
             "iteration_id": trace["iteration_id"],
             "recorded_at_utc": utc_now(),
-            "decision": "accepted" if accepted_indices else "rejected" if proposals else "no_proposal",
+            "decision": "interrupted" if interrupted else (
+                "accepted" if accepted_indices else "rejected" if proposals else "no_proposal"
+            ),
+            "error_type": error_events[-1]["error_type"] if interrupted else None,
             "selected_parent_candidate_idx": parent_idx,
             "selected_parent_iteration_id": state.iteration_ids_by_candidate_idx[parent_idx] if parent_idx is not None else None,
             "accepted_candidate_indices": accepted_indices,
@@ -317,7 +324,8 @@ class EvolutionLog:
                       state.total_num_evals, state.full_program_trace)
         if self.checkpoint_hook is not None:
             self.checkpoint_hook()
-        print(f"GEPA 반복 {iteration}: 후보 {'채택' if event['proposal_accepted'] else '미채택'}", flush=True)
+        outcome = "중단" if interrupted else "채택" if event["proposal_accepted"] else "미채택"
+        print(f"GEPA 반복 {iteration}: 후보 {outcome}", flush=True)
 
     def on_state_saved(self, event: dict) -> None:
         self._append("state_saved", {"iteration": event["iteration"], "run_dir": event["run_dir"]})
@@ -494,6 +502,7 @@ def optimize_run(
         "base_url": settings.base_url,
         "temperature": settings.temperature,
         "max_output_tokens": settings.max_output_tokens,
+        "reflection_max_output_tokens": settings.reflection_max_output_tokens,
         "timeout_seconds": settings.timeout_seconds,
         "max_metric_calls": max_metric_calls,
         "max_api_calls": max_api_calls,
