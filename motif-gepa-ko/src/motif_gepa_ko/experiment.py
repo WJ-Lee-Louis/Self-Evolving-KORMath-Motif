@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import gepa
 from gepa.core.state import GEPAState
+from openai import APIConnectionError, APIStatusError
 
 from motif_gepa_ko.artifacts import (
     SCHEMA_VERSION, append_jsonl, audit_run, make_manifest, read_jsonl,
@@ -18,10 +19,10 @@ from motif_gepa_ko.artifacts import (
 )
 from motif_gepa_ko.data import as_gepa_data, load_split
 from motif_gepa_ko.bilingual import (
-    BilingualMathEvaluator, as_v2_gepa_data, load_v2_split, score_v2,
+    BilingualMathEvaluator, V2_DATASETS, as_v2_gepa_data, load_v2_split, score_v2,
 )
 from motif_gepa_ko.gepa_setup import load_prompt_assets
-from motif_gepa_ko.model import MotifLM
+from motif_gepa_ko.model import EmptyModelResponseError, MotifLM, RequestDeadlineExceeded
 from motif_gepa_ko.sampling import OmniStratifiedBatchSampler, SAMPLER_NAME
 from motif_gepa_ko.scoring import KoreanMathEvaluator, score_response
 from motif_gepa_ko.settings import PROJECT_ROOT, Settings
@@ -41,6 +42,14 @@ def _run_path(runs_dir: Path, run_id: str) -> Path:
     return runs_dir / run_id
 
 
+def _retryable_model_error(exc: BaseException) -> bool:
+    if isinstance(exc, (RequestDeadlineExceeded, APIConnectionError, EmptyModelResponseError)):
+        return True
+    return isinstance(exc, APIStatusError) and (
+        exc.status_code in (408, 409, 429) or exc.status_code >= 500
+    )
+
+
 class CountedLM:
     """Bound logical LLM calls across both GEPA roles."""
 
@@ -54,6 +63,14 @@ class CountedLM:
         self.provider_calls = 0
         self.replayed_calls = 0
         self.log_path = log_path
+        self.attempt_log_path = (
+            log_path.with_name(
+                log_path.name.replace("api_requests.jsonl", "api_attempts.jsonl")
+                if log_path.name.endswith("api_requests.jsonl")
+                else f"{log_path.stem}_attempts.jsonl"
+            )
+            if log_path is not None else None
+        )
         self.session_id = session_id
         self.context: dict[str, Any] = {}
         self.question_lookup = question_lookup or {}
@@ -80,7 +97,8 @@ class CountedLM:
             "started_at_utc": utc_now(),
             "role": "reflection" if isinstance(prompt, str) else "task",
             "timeout_seconds": getattr(getattr(self.lm, "settings", None), "timeout_seconds", None),
-            "sdk_max_retries": 2,
+            "sdk_max_retries": 0,
+            "max_attempts": getattr(getattr(self.lm, "settings", None), "max_attempts", 1),
             "request": prompt,
             "prompt_sha256": sha256_text(json.dumps(prompt, ensure_ascii=False, default=str)),
             **self.context,
@@ -96,10 +114,54 @@ class CountedLM:
                 response = cached
                 self.replayed_calls += 1
                 record["served_from_prior_session"] = True
+                record["provider_attempts"] = 0
             else:
-                self.provider_calls += 1
-                response = self.lm(prompt)
                 record["served_from_prior_session"] = False
+                for attempt_number in range(1, record["max_attempts"] + 1):
+                    self.provider_calls += 1
+                    record["provider_attempts"] = attempt_number
+                    attempt = {
+                        "session_id": self.session_id,
+                        "logical_call_number": self.calls,
+                        "attempt_number": attempt_number,
+                        "prompt_sha256": record["prompt_sha256"],
+                        "role": record["role"],
+                        "question_matches": record.get("question_matches", []),
+                        "started_at_utc": utc_now(),
+                    }
+                    if self.attempt_log_path is not None:
+                        append_jsonl(self.attempt_log_path, {**attempt, "event": "started"})
+                    attempt_started = time.perf_counter()
+                    try:
+                        response = self.lm(prompt)
+                    except BaseException as exc:
+                        if self.attempt_log_path is not None:
+                            append_jsonl(self.attempt_log_path, {
+                                **attempt, "event": "error", "ended_at_utc": utc_now(),
+                                "duration_seconds": round(time.perf_counter() - attempt_started, 3),
+                                "error_type": type(exc).__name__,
+                                "http_status_code": getattr(exc, "status_code", None),
+                                "request_id": getattr(exc, "request_id", None),
+                            })
+                        if not _retryable_model_error(exc) or attempt_number == record["max_attempts"]:
+                            raise
+                        if self.checkpoint_hook is not None:
+                            self.checkpoint_hook()
+                        print(
+                            f"Motif {record['role']} call {self.calls}: attempt "
+                            f"{attempt_number}/{record['max_attempts']} failed "
+                            f"({type(exc).__name__}); retrying.", flush=True,
+                        )
+                        time.sleep(min(2 ** attempt_number, 8))
+                    else:
+                        if self.attempt_log_path is not None:
+                            metadata = getattr(self.lm, "last_response_metadata", None) or {}
+                            append_jsonl(self.attempt_log_path, {
+                                **attempt, "event": "success", "ended_at_utc": utc_now(),
+                                "duration_seconds": round(time.perf_counter() - attempt_started, 3),
+                                "response_id": metadata.get("response_id"),
+                            })
+                        break
             record.update({
                 "status": "success", "response": response,
                 "response_sha256": sha256_text(response),
@@ -530,7 +592,7 @@ def optimize_run(
     batch_sampling: str = "auto",
     language: str = "ko",
 ) -> dict:
-    is_v2 = data_dir.name == "omni_v2"
+    is_v2 = data_dir.name in V2_DATASETS
     if not is_v2 and language != "ko":
         raise ValueError("Only omni_v2 supports English runs")
     train_records = load_v2_split(data_dir, "train", language) if is_v2 else load_split(data_dir, "train")
@@ -571,6 +633,7 @@ def optimize_run(
         "max_output_tokens": settings.max_output_tokens,
         "reflection_max_output_tokens": settings.reflection_max_output_tokens,
         "timeout_seconds": settings.timeout_seconds,
+        "max_attempts": settings.max_attempts,
         "max_metric_calls": max_metric_calls,
         "max_api_calls": max_api_calls,
         "minibatch_size": minibatch_size,
@@ -585,7 +648,7 @@ def optimize_run(
     }
     if is_v2:
         config.update({
-            "dataset_version": "omni_v2", "language": language,
+            "dataset_version": data_dir.name, "language": language,
             "training_feedback": "answer_and_reference_solution",
             "train_solutions_ko_sha256": (
                 _sha256(data_dir / "train_solutions_ko.jsonl") if language == "ko" else None
@@ -726,7 +789,7 @@ def evaluate_run(
     settings = Settings.from_env()
     config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
     run_manifest = json.loads((run_dir / "run_manifest.json").read_text(encoding="utf-8"))
-    is_v2 = config.get("dataset_version") == "omni_v2"
+    is_v2 = config.get("dataset_version") in V2_DATASETS
     saved_language = config.get("language", "ko")
     if language is not None and language != saved_language:
         raise ValueError("Evaluation language must match the optimized run")
@@ -744,8 +807,8 @@ def evaluate_run(
         raise ValueError("진화 때와 평가 때의 모델 ID 또는 생성 설정이 다릅니다.")
     source_path = data_dir / f"{split}.jsonl"
     snapshot_input(source_path, run_dir / "inputs" / source_path.name)
-    if is_v2 and data_dir.name != "omni_v2":
-        raise ValueError("The run requires the omni_v2 dataset")
+    if is_v2 and data_dir.name != config["dataset_version"]:
+        raise ValueError(f"The run requires the {config['dataset_version']} dataset")
     records = load_v2_split(data_dir, split, language) if is_v2 else load_split(data_dir, split)
     if limit:
         records = records[:limit]

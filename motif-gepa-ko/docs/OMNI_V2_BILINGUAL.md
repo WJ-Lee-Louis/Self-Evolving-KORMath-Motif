@@ -1,5 +1,7 @@
 # Omni-MATH v2: 한국어·영어 프롬프트 진화 비교
 
+**2026-09-27 갱신:** 아래 분할 수치와 명령은 기존 `omni_v2` 실행의 기록이다. 새 영어 실행과 이후 한국어 비교에는 문맥 의존 문항을 제거한 [`omni_v2_clean` 설계](OMNI_V2_CLEAN.md)를 사용한다. 기존 영어 실행은 중단되었으며 번역 작업은 계속 진행 중이다.
+
 기존 `omni_v1` 실행은 프롬프트 변화 관찰용이다. **v2는 원본 정제 풀에서 독립적으로 다시 분할한 새 실험**이며, v1에서 진화한 프롬프트를 초기 프롬프트로 재사용하지 않는다. 한국어·영어 실행은 같은 Motif 3, 문항 ID, 정답, 난이도별 미니배치, 채점기, 호출 예산을 사용한다. 문제·풀이·모범해설·reflection에 쓰이는 언어만 바뀐다.
 
 ## 데이터 원본과 분할
@@ -62,6 +64,8 @@ $env:PYTHONIOENCODING='utf-8'
 .\.venv\Scripts\modal.exe run --detach .\modal_experiment.py::optimize --dataset omni_v2 --language ko --run-id ko-omni-v2-b600-s0 --minibatch-size 5 --batch-sampling omni_difficulty_1_3_1 --max-metric-calls 600 --max-api-calls 1200 --seed 0
 .\.venv\Scripts\modal.exe run --detach .\modal_experiment.py::optimize --dataset omni_v2 --language en --run-id en-omni-v2-b600-s0 --minibatch-size 5 --batch-sampling omni_difficulty_1_3_1 --max-metric-calls 600 --max-api-calls 1200 --seed 0
 ```
+
+2026-09-27 이후 새 코드로 시작하는 실행은 [API 요청 시간 정책](API_TIMEOUT_RETRY.md)의 720초·최대 3회 시도를 사용한다. 이미 실행 중인 `en-omni-v2-b600-s0`는 이전 Modal 이미지와 설정으로 계속 동작한다. 새 정책으로 다시 시작하려면 새 run ID를 사용해야 한다. 기존 run ID에 새 코드를 적용하면 실행 출처 검사가 설정·코드 불일치를 감지해 중단한다.
 
 기존 v1 Modal 작업은 처음 전송된 원격 이미지로 계속 실행된다. 로컬 코드가 달라졌으므로 **편집된 현재 파일로 기존 run ID를 수동 재시작하지 않는다.** 이전 실행 코드는 IEPBL Git 리비전 `bbf05d3a055219b778152ad94176d5ab0d84c6e9`에 있다. 기존 작업이 끝나면 프롬프트와 계보 기록을 내려받아 관찰한 다음 v1 전용 파일을 정리할 수 있다. 이 작업에서 Git 커밋·푸시는 하지 않는다.
 

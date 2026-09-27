@@ -76,11 +76,22 @@ def order(index: int, bin_name: str) -> tuple[str, int]:
     return digest(f"{SEED}|{bin_name}|{index}".encode()), index
 
 
-def build() -> dict[str, bytes]:
+def build(*, excluded_dependent_rows: frozenset[int] = frozenset()) -> dict[str, bytes]:
     if digest(SOURCE.read_bytes()) != EXPECTED_SOURCE_SHA256:
         raise ValueError("HRM8K source checksum changed")
     rows = read_csv(SOURCE)
     selected, excluded = cleaned_indices(rows)
+    if not excluded_dependent_rows.issubset(selected):
+        raise ValueError("A context-dependent row is absent from the original cleaned pool")
+    if excluded_dependent_rows:
+        selected = [index for index in selected if index not in excluded_dependent_rows]
+        excluded.update({index: "exclude_missing_problem_context" for index in excluded_dependent_rows})
+        unresolved = [
+            index for index in selected
+            if re.search(r"\b(?:problem|question|exercise)\s*\(?\s*\d+\b", rows[index]["original"], re.I)
+        ]
+        if unresolved:
+            raise ValueError(f"Unresolved numbered-problem references: {unresolved}")
     source_matches = original_matches()
     matches_by_index: dict[int, list[tuple[int, dict]]] = {}
     for index in selected:
@@ -109,7 +120,8 @@ def build() -> dict[str, bytes]:
     chosen["test_id"].extend(forced_test)
     if set.union(*(set(v) for v in chosen.values())) != set(selected):
         raise ValueError("Split coverage or overlap failed")
-    if [len(chosen[name]) for name in ("train", "val", "test_id")] != [1000, 50, 768]:
+    expected_test = len(selected) - 1000 - 50
+    if [len(chosen[name]) for name in ("train", "val", "test_id")] != [1000, 50, expected_test]:
         raise ValueError("Unexpected split sizes")
 
     output: dict[str, bytes] = {}
@@ -156,6 +168,10 @@ def build() -> dict[str, bytes]:
         "forced_test_multi_match_source_rows": sorted(forced_test),
         "splits": split_manifest,
     }
+    if excluded_dependent_rows:
+        manifest["schema_version"] = 3
+        manifest["selection_rule"] += " Exclude questions requiring absent numbered-problem context before allocation."
+        manifest["excluded_context_dependency_source_rows"] = sorted(excluded_dependent_rows)
     output["manifest.json"] = (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     return output
 

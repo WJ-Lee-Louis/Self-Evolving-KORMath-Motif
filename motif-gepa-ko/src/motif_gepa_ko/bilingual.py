@@ -14,14 +14,15 @@ from motif_gepa_ko.data import load_split
 
 
 LANGUAGES = ("ko", "en")
+V2_DATASETS = ("omni_v2", "omni_v2_clean")
 FINAL_LINE = re.compile(
     r"^\s*FINAL_ANSWER\s*:\s*([+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*\.?\s*$"
 )
 
 
 def load_v2_split(data_dir: Path, split: str, language: str) -> list[dict]:
-    if data_dir.name != "omni_v2" or language not in LANGUAGES:
-        raise ValueError("omni_v2 dataset and language ko/en are required")
+    if data_dir.name not in V2_DATASETS or language not in LANGUAGES:
+        raise ValueError("An Omni v2 dataset and language ko/en are required")
     records = load_split(data_dir, split)
     translations = {}
     if split == "train" and language == "ko":

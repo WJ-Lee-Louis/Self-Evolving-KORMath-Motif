@@ -11,12 +11,14 @@ volume = modal.Volume.from_name("motif-gepa-ko-runs", create_if_missing=True)
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("openai>=1.0,<3", "python-dotenv>=1.0,<2")
-    .env({"MOTIF_TIMEOUT_SECONDS": "1800", "MOTIF_TEMPERATURE": "0", "MOTIF_MAX_OUTPUT_TOKENS": "16384",
+    .env({"MOTIF_TIMEOUT_SECONDS": "720", "MOTIF_MAX_ATTEMPTS": "3",
+          "MOTIF_TEMPERATURE": "0", "MOTIF_MAX_OUTPUT_TOKENS": "16384",
           "MOTIF_REFLECTION_MAX_OUTPUT_TOKENS": "4096"})
     .add_local_python_source("gepa", "motif_gepa_ko")
     .add_local_dir(str(ROOT / "data" / "hrm8k_v1"), remote_path="/workspace/data/hrm8k_v1")
     .add_local_dir(str(ROOT / "data" / "omni_v1"), remote_path="/workspace/data/omni_v1")
     .add_local_dir(str(ROOT / "data" / "omni_v2"), remote_path="/workspace/data/omni_v2")
+    .add_local_dir(str(ROOT / "data" / "omni_v2_clean"), remote_path="/workspace/data/omni_v2_clean")
     .add_local_dir(str(ROOT / "prompts"), remote_path="/workspace/prompts")
 )
 secret = modal.Secret.from_name("motif-gepa-infron", required_keys=["INFRON_API_KEY"])
@@ -26,7 +28,7 @@ resume_retries = modal.Retries(initial_delay=0.0, max_retries=10)
 
 
 def dataset_dir(dataset: str) -> Path:
-    if dataset not in {"hrm8k_v1", "omni_v1", "omni_v2"}:
+    if dataset not in {"hrm8k_v1", "omni_v1", "omni_v2", "omni_v2_clean"}:
         raise ValueError(f"Unknown dataset: {dataset}")
     return Path("/workspace/data") / dataset
 
@@ -44,9 +46,10 @@ def preflight_remote(dataset: str = "hrm8k_v1", language: str = "ko") -> dict:
     from motif_gepa_ko.settings import PROJECT_ROOT
 
     data_dir = dataset_dir(dataset)
-    prompt_dir = Path("/workspace/prompts/omni_v2") if dataset == "omni_v2" else Path("/workspace/prompts")
+    is_v2 = dataset in {"omni_v2", "omni_v2_clean"}
+    prompt_dir = Path("/workspace/prompts/omni_v2") if is_v2 else Path("/workspace/prompts")
     seed, reflection = load_prompt_assets(prompt_dir, language)
-    train = load_v2_split(data_dir, "train", language) if dataset == "omni_v2" else load_split(data_dir, "train")
+    train = load_v2_split(data_dir, "train", language) if is_v2 else load_split(data_dir, "train")
     archive_probe = make_manifest(
         PROJECT_ROOT, {"run_id": "preflight"},
         {"train": data_dir / "train.jsonl", "val": data_dir / "val.jsonl"},
@@ -63,9 +66,9 @@ def preflight_remote(dataset: str = "hrm8k_v1", language: str = "ko") -> dict:
         "artifact_schema_version": archive_probe["schema_version"],
         "code_files_hashed": len(archive_probe["code_sha256"]),
     }
-    if dataset in {"omni_v1", "omni_v2"}:
+    if dataset in {"omni_v1", "omni_v2", "omni_v2_clean"}:
         sampler = OmniStratifiedBatchSampler(train, seed=0)
-        gepa_train = as_v2_gepa_data(train) if dataset == "omni_v2" else as_gepa_data(train)
+        gepa_train = as_v2_gepa_data(train) if is_v2 else as_gepa_data(train)
         selected = sampler.next_minibatch_ids(ListDataLoader(gepa_train), SimpleNamespace(i=0))
         result["batch_sampling"] = sampler.describe()
         result["sample_batch_ids"] = [train[index]["id"] for index in selected]
@@ -83,7 +86,7 @@ def optimize_remote(run_id: str, max_metric_calls: int, max_api_calls: int, mini
     try:
         return optimize_run(
             data_dir=dataset_dir(dataset),
-            prompts_dir=Path("/workspace/prompts/omni_v2") if dataset == "omni_v2" else Path("/workspace/prompts"),
+            prompts_dir=Path("/workspace/prompts/omni_v2") if dataset in {"omni_v2", "omni_v2_clean"} else Path("/workspace/prompts"),
             runs_dir=Path("/results"),
             run_id=run_id,
             max_metric_calls=max_metric_calls,
