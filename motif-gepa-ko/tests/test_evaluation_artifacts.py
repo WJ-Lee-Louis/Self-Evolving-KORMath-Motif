@@ -42,16 +42,20 @@ class EvaluationArtifactTests(unittest.TestCase):
                      "source_subset": "GSM8K", "source_row_index": idx} for idx in range(2)]
             (data_dir / "test_id.jsonl").write_text(
                 "\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+            checkpoints = []
             with patch("motif_gepa_ko.experiment.MotifLM", FakeLM), patch(
                 "motif_gepa_ko.experiment.Settings.from_env", return_value=settings
             ):
                 first = evaluate_run(data_dir=data_dir, runs_dir=root / "runs", run_id="mock",
-                                     split="test_id", limit=1, max_api_calls=2)
+                                     split="test_id", limit=1, max_api_calls=2,
+                                     checkpoint_hook=lambda: checkpoints.append("paired"))
                 full = evaluate_run(data_dir=data_dir, runs_dir=root / "runs", run_id="mock",
-                                    split="test_id", limit=0, max_api_calls=2)
+                                    split="test_id", limit=0, max_api_calls=2,
+                                    checkpoint_hook=lambda: checkpoints.append("paired"))
             self.assertEqual((first["completed"], full["completed"]), (1, 2))
             self.assertEqual(full["question_ids"], ["test-0", "test-1"])
             self.assertEqual(full["best_accuracy"], 1)
+            self.assertEqual(checkpoints, ["paired", "paired"])
             paired = [json.loads(line) for line in (run_dir / "test_id_paired.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual(len(paired), 2)
             self.assertEqual(paired[1]["question"], "problem 1")

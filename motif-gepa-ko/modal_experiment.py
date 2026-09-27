@@ -16,6 +16,7 @@ image = (
     .add_local_python_source("gepa", "motif_gepa_ko")
     .add_local_dir(str(ROOT / "data" / "hrm8k_v1"), remote_path="/workspace/data/hrm8k_v1")
     .add_local_dir(str(ROOT / "data" / "omni_v1"), remote_path="/workspace/data/omni_v1")
+    .add_local_dir(str(ROOT / "data" / "omni_v2"), remote_path="/workspace/data/omni_v2")
     .add_local_dir(str(ROOT / "prompts"), remote_path="/workspace/prompts")
 )
 secret = modal.Secret.from_name("motif-gepa-infron", required_keys=["INFRON_API_KEY"])
@@ -25,25 +26,27 @@ resume_retries = modal.Retries(initial_delay=0.0, max_retries=10)
 
 
 def dataset_dir(dataset: str) -> Path:
-    if dataset not in {"hrm8k_v1", "omni_v1"}:
+    if dataset not in {"hrm8k_v1", "omni_v1", "omni_v2"}:
         raise ValueError(f"Unknown dataset: {dataset}")
     return Path("/workspace/data") / dataset
 
 
 @app.function(image=image, timeout=120, cpu=0.25, memory=512)
-def preflight_remote(dataset: str = "hrm8k_v1") -> dict:
+def preflight_remote(dataset: str = "hrm8k_v1", language: str = "ko") -> dict:
     import gepa
     from gepa.core.data_loader import ListDataLoader
     from types import SimpleNamespace
     from motif_gepa_ko.artifacts import make_manifest
     from motif_gepa_ko.data import as_gepa_data, load_split
+    from motif_gepa_ko.bilingual import as_v2_gepa_data, load_v2_split
     from motif_gepa_ko.gepa_setup import load_prompt_assets
     from motif_gepa_ko.sampling import OmniStratifiedBatchSampler, batch_bin_counts
     from motif_gepa_ko.settings import PROJECT_ROOT
 
     data_dir = dataset_dir(dataset)
-    seed, reflection = load_prompt_assets(Path("/workspace/prompts"))
-    train = load_split(data_dir, "train")
+    prompt_dir = Path("/workspace/prompts/omni_v2") if dataset == "omni_v2" else Path("/workspace/prompts")
+    seed, reflection = load_prompt_assets(prompt_dir, language)
+    train = load_v2_split(data_dir, "train", language) if dataset == "omni_v2" else load_split(data_dir, "train")
     archive_probe = make_manifest(
         PROJECT_ROOT, {"run_id": "preflight"},
         {"train": data_dir / "train.jsonl", "val": data_dir / "val.jsonl"},
@@ -54,14 +57,16 @@ def preflight_remote(dataset: str = "hrm8k_v1") -> dict:
         "dataset": dataset,
         "train_rows": len(train),
         "val_rows": len(load_split(data_dir, "val")),
+        "language": language,
         "seed_chars": len(seed),
         "reflection_chars": len(reflection),
         "artifact_schema_version": archive_probe["schema_version"],
         "code_files_hashed": len(archive_probe["code_sha256"]),
     }
-    if dataset == "omni_v1":
+    if dataset in {"omni_v1", "omni_v2"}:
         sampler = OmniStratifiedBatchSampler(train, seed=0)
-        selected = sampler.next_minibatch_ids(ListDataLoader(as_gepa_data(train)), SimpleNamespace(i=0))
+        gepa_train = as_v2_gepa_data(train) if dataset == "omni_v2" else as_gepa_data(train)
+        selected = sampler.next_minibatch_ids(ListDataLoader(gepa_train), SimpleNamespace(i=0))
         result["batch_sampling"] = sampler.describe()
         result["sample_batch_ids"] = [train[index]["id"] for index in selected]
         result["sample_batch_bins"] = batch_bin_counts(selected, train)
@@ -71,14 +76,14 @@ def preflight_remote(dataset: str = "hrm8k_v1") -> dict:
 @app.function(image=image, secrets=[secret], volumes={"/results": volume}, timeout=86400,
               retries=resume_retries, cpu=0.5, memory=1024)
 def optimize_remote(run_id: str, max_metric_calls: int, max_api_calls: int, minibatch_size: int, seed: int,
-                    dataset: str = "hrm8k_v1", batch_sampling: str = "auto") -> dict:
+                    dataset: str = "hrm8k_v1", batch_sampling: str = "auto", language: str = "ko") -> dict:
     from motif_gepa_ko.experiment import optimize_run
 
     volume.reload()
     try:
         return optimize_run(
             data_dir=dataset_dir(dataset),
-            prompts_dir=Path("/workspace/prompts"),
+            prompts_dir=Path("/workspace/prompts/omni_v2") if dataset == "omni_v2" else Path("/workspace/prompts"),
             runs_dir=Path("/results"),
             run_id=run_id,
             max_metric_calls=max_metric_calls,
@@ -86,6 +91,7 @@ def optimize_remote(run_id: str, max_metric_calls: int, max_api_calls: int, mini
             minibatch_size=minibatch_size,
             seed=seed,
             batch_sampling=batch_sampling,
+            language=language,
             checkpoint_hook=volume.commit,
         )
     finally:
@@ -95,7 +101,7 @@ def optimize_remote(run_id: str, max_metric_calls: int, max_api_calls: int, mini
 @app.function(image=image, secrets=[secret], volumes={"/results": volume}, timeout=86400,
               retries=resume_retries, cpu=0.5, memory=1024)
 def evaluate_remote(run_id: str, split: str, limit: int, max_api_calls: int,
-                    dataset: str = "hrm8k_v1") -> dict:
+                    dataset: str = "hrm8k_v1", language: str = "ko") -> dict:
     from motif_gepa_ko.experiment import evaluate_run
 
     volume.reload()
@@ -107,14 +113,16 @@ def evaluate_remote(run_id: str, split: str, limit: int, max_api_calls: int,
             split=split,
             limit=limit,
             max_api_calls=max_api_calls,
+            language=language,
+            checkpoint_hook=volume.commit,
         )
     finally:
         volume.commit()
 
 
 @app.local_entrypoint()
-def preflight(dataset: str = "hrm8k_v1") -> None:
-    print(preflight_remote.remote(dataset))
+def preflight(dataset: str = "hrm8k_v1", language: str = "ko") -> None:
+    print(preflight_remote.remote(dataset, language))
 
 
 @app.local_entrypoint()
@@ -126,12 +134,13 @@ def optimize(
     seed: int = 0,
     dataset: str = "hrm8k_v1",
     batch_sampling: str = "auto",
+    language: str = "ko",
 ) -> None:
     print(optimize_remote.spawn(run_id, max_metric_calls, max_api_calls, minibatch_size, seed,
-                                dataset, batch_sampling).get())
+                                dataset, batch_sampling, language).get())
 
 
 @app.local_entrypoint()
 def evaluate(run_id: str, split: str, limit: int = 20, max_api_calls: int = 100,
-             dataset: str = "hrm8k_v1") -> None:
-    print(evaluate_remote.spawn(run_id, split, limit, max_api_calls, dataset).get())
+             dataset: str = "hrm8k_v1", language: str = "ko") -> None:
+    print(evaluate_remote.spawn(run_id, split, limit, max_api_calls, dataset, language).get())

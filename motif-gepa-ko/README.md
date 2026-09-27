@@ -1,10 +1,12 @@
-# Motif 3 기반 한국어 GEPA 실험 준비
+# Motif 3 기반 한국어·영어 GEPA 실험
+
+**새 실험:** 한국어·영어 Omni-MATH 프롬프트 진화 비교는 [Omni v2 설계 및 실행 안내](docs/OMNI_V2_BILINGUAL.md)를 참고하세요. 독립적으로 다시 분할한 train 1,000·val 50·test 768문항을 사용하며, 기존 `omni_v1` 실행의 진화 프롬프트는 새 실험에 재사용하지 않습니다.
 
 확정된 HRM8K 데이터 구성과 문항별 분할 규칙은 [데이터 분할 문서](docs/DATA_SPLITS.md)를 참고하세요. 생성된 JSONL과 전체 원본 행 번호 목록은 [`data/hrm8k_v1/`](data/hrm8k_v1/)에 있습니다.
 
 새 한국어 Omni-MATH 진화용 데이터는 그림·비정확 채점·외부 정보 문항을 걸러 [`data/omni_v1/`](data/omni_v1/)에 별도로 구성했습니다. 원본 1,909문항 중 1,818문항을 train 1,272·val 182·test 364로 나눈 기준은 [Omni 분할 문서](docs/OMNI_EVOLUTION_DESIGN.md)를 참고하세요.
 
-이 폴더는 한국어 수학 문제에 대한 **시스템 프롬프트 진화**를 실행합니다. HRM8K 분할, 숫자 채점 규칙, 예비 실행 예산을 고정했습니다. `upstream/gepa` 원본은 수정하지 않습니다.
+이 폴더는 수학 문제에 대한 **시스템 프롬프트 진화**를 실행합니다. 기존 한국어 HRM8K·Omni v1 관찰용 실행과 새 한국어·영어 Omni v2 비교 실험을 구분합니다. `upstream/gepa` 원본은 수정하지 않습니다.
 
 ## 현재 구성
 

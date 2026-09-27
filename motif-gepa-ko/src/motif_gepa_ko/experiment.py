@@ -17,6 +17,9 @@ from motif_gepa_ko.artifacts import (
     write_json, write_lineage, write_proposal_graph, write_text,
 )
 from motif_gepa_ko.data import as_gepa_data, load_split
+from motif_gepa_ko.bilingual import (
+    BilingualMathEvaluator, as_v2_gepa_data, load_v2_split, score_v2,
+)
 from motif_gepa_ko.gepa_setup import load_prompt_assets
 from motif_gepa_ko.model import MotifLM
 from motif_gepa_ko.sampling import OmniStratifiedBatchSampler, SAMPLER_NAME
@@ -525,9 +528,13 @@ def optimize_run(
     seed: int = 0,
     checkpoint_hook: Callable[[], None] | None = None,
     batch_sampling: str = "auto",
+    language: str = "ko",
 ) -> dict:
-    train_records = load_split(data_dir, "train")
-    val_records = load_split(data_dir, "val")
+    is_v2 = data_dir.name == "omni_v2"
+    if not is_v2 and language != "ko":
+        raise ValueError("Only omni_v2 supports English runs")
+    train_records = load_v2_split(data_dir, "train", language) if is_v2 else load_split(data_dir, "train")
+    val_records = load_v2_split(data_dir, "val", language) if is_v2 else load_split(data_dir, "val")
     if max_metric_calls < len(val_records) or max_api_calls < max_metric_calls or minibatch_size < 1:
         raise ValueError("예산 조건: max_metric_calls >= val 크기, max_api_calls >= max_metric_calls, minibatch_size >= 1")
     if {r["id"] for r in train_records} & {r["id"] for r in val_records}:
@@ -552,7 +559,7 @@ def optimize_run(
             "name": "epoch_shuffled", "minibatch_size": minibatch_size, "seed": seed,
         }
     settings = Settings.from_env()
-    seed_prompt, reflection_prompt = load_prompt_assets(prompts_dir)
+    seed_prompt, reflection_prompt = load_prompt_assets(prompts_dir, language)
     run_dir = _run_path(runs_dir, run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
     config = {
@@ -573,9 +580,17 @@ def optimize_run(
         "val_count": len(val_records),
         "train_sha256": _sha256(data_dir / "train.jsonl"),
         "val_sha256": _sha256(data_dir / "val.jsonl"),
-        "seed_prompt_sha256": _sha256(prompts_dir / "seed_ko.md"),
-        "reflection_prompt_sha256": _sha256(prompts_dir / "reflection_ko.md"),
+        "seed_prompt_sha256": _sha256(prompts_dir / f"seed_{language}.md"),
+        "reflection_prompt_sha256": _sha256(prompts_dir / f"reflection_{language}.md"),
     }
+    if is_v2:
+        config.update({
+            "dataset_version": "omni_v2", "language": language,
+            "training_feedback": "answer_and_reference_solution",
+            "train_solutions_ko_sha256": (
+                _sha256(data_dir / "train_solutions_ko.jsonl") if language == "ko" else None
+            ),
+        })
     config_path = run_dir / "config.json"
     if config_path.exists() and json.loads(config_path.read_text(encoding="utf-8")) != config:
         raise ValueError("같은 run_id의 설정이 다릅니다. 새 run_id를 사용하세요.")
@@ -583,9 +598,11 @@ def optimize_run(
     input_sources = {
         "train": data_dir / "train.jsonl",
         "val": data_dir / "val.jsonl",
-        "seed_prompt": prompts_dir / "seed_ko.md",
-        "reflection_template": prompts_dir / "reflection_ko.md",
+        "seed_prompt": prompts_dir / f"seed_{language}.md",
+        "reflection_template": prompts_dir / f"reflection_{language}.md",
     }
+    if is_v2 and language == "ko":
+        input_sources["train_solutions_ko"] = data_dir / "train_solutions_ko.jsonl"
     input_paths = {}
     for name, source in input_sources.items():
         target = run_dir / "inputs" / source.name
@@ -629,10 +646,10 @@ def optimize_run(
     try:
         result = gepa.optimize(
             seed_candidate={"system_prompt": seed_prompt},
-            trainset=as_gepa_data(train_records),
-            valset=as_gepa_data(val_records),
+            trainset=as_v2_gepa_data(train_records) if is_v2 else as_gepa_data(train_records),
+            valset=as_v2_gepa_data(val_records) if is_v2 else as_gepa_data(val_records),
             task_lm=lm,
-            evaluator=KoreanMathEvaluator(),
+            evaluator=BilingualMathEvaluator(language) if is_v2 else KoreanMathEvaluator(),
             reflection_lm=lm,
             reflection_prompt_template=reflection_prompt,
             **(
@@ -696,6 +713,8 @@ def evaluate_run(
     split: str,
     limit: int = 20,
     max_api_calls: int = 100,
+    language: str | None = None,
+    checkpoint_hook: Callable[[], None] | None = None,
 ) -> dict:
     if not split.startswith("test_"):
         raise ValueError("보류 평가에는 test_* 분할만 사용할 수 있습니다.")
@@ -707,8 +726,14 @@ def evaluate_run(
     settings = Settings.from_env()
     config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
     run_manifest = json.loads((run_dir / "run_manifest.json").read_text(encoding="utf-8"))
-    scoring_sha256 = _sha256(Path(__file__).with_name("scoring.py"))
-    if run_manifest["code_sha256"]["motif_gepa_ko/scoring.py"] != scoring_sha256:
+    is_v2 = config.get("dataset_version") == "omni_v2"
+    saved_language = config.get("language", "ko")
+    if language is not None and language != saved_language:
+        raise ValueError("Evaluation language must match the optimized run")
+    language = saved_language
+    scoring_module = "bilingual.py" if is_v2 else "scoring.py"
+    scoring_sha256 = _sha256(Path(__file__).with_name(scoring_module))
+    if run_manifest["code_sha256"][f"motif_gepa_ko/{scoring_module}"] != scoring_sha256:
         raise ValueError("진화 때와 채점 코드가 다릅니다. 보류 평가의 점수 정의를 바꾸지 마세요.")
     if (
         settings.model != config["model"]
@@ -719,7 +744,9 @@ def evaluate_run(
         raise ValueError("진화 때와 평가 때의 모델 ID 또는 생성 설정이 다릅니다.")
     source_path = data_dir / f"{split}.jsonl"
     snapshot_input(source_path, run_dir / "inputs" / source_path.name)
-    records = load_split(data_dir, split)
+    if is_v2 and data_dir.name != "omni_v2":
+        raise ValueError("The run requires the omni_v2 dataset")
+    records = load_v2_split(data_dir, split, language) if is_v2 else load_split(data_dir, split)
     if limit:
         records = records[:limit]
     output_path = run_dir / f"{split}_paired.jsonl"
@@ -743,6 +770,8 @@ def evaluate_run(
         "max_output_tokens": settings.max_output_tokens,
         "scoring_code_sha256": scoring_sha256,
     }
+    if is_v2:
+        metadata["language"] = language
     metadata_path = run_dir / f"{split}_metadata.json"
     if metadata_path.exists() and json.loads(metadata_path.read_text(encoding="utf-8")) != metadata:
         raise ValueError("이전 보류 평가와 데이터·프롬프트·모델·채점 코드가 다릅니다. 새 run_id를 사용하세요.")
@@ -755,7 +784,8 @@ def evaluate_run(
         "selected_question_ids": [item["id"] for item in records],
     })
     lm = CountedLM(MotifLM(settings), max_api_calls,
-                   log_path=run_dir / f"{split}_api_requests.jsonl", session_id=session_id)
+                   log_path=run_dir / f"{split}_api_requests.jsonl", session_id=session_id,
+                   checkpoint_hook=checkpoint_hook)
     try:
         for item in records:
             if item["id"] in done:
@@ -770,9 +800,14 @@ def evaluate_run(
             for name, prompt in prompts.items():
                 lm.context = {"split": split, "question_id": item["id"], "prompt_variant": name}
                 response = lm([{"role": "system", "content": prompt}, {"role": "user", "content": item["question"]}])
-                score, feedback, parsed = score_response(item["answer"], response)
+                score, feedback, parsed = (
+                    score_v2(item["answer"], response, language)
+                    if is_v2 else score_response(item["answer"], response)
+                )
                 row[name] = {"score": score, "parsed_answer": parsed, "feedback": feedback, "response": response}
             append_jsonl(output_path, row)
+            if checkpoint_hook is not None:
+                checkpoint_hook()
     except BaseException as exc:
         append_jsonl(session_path, {
             "session_id": session_id, "event": "interrupted", "at_utc": utc_now(),
