@@ -19,6 +19,7 @@ image = (
     .add_local_dir(str(ROOT / "data" / "omni_v1"), remote_path="/workspace/data/omni_v1")
     .add_local_dir(str(ROOT / "data" / "omni_v2"), remote_path="/workspace/data/omni_v2")
     .add_local_dir(str(ROOT / "data" / "omni_v2_clean"), remote_path="/workspace/data/omni_v2_clean")
+    .add_local_dir(str(ROOT / "data" / "omni_v2_clean_curated"), remote_path="/workspace/data/omni_v2_clean_curated")
     .add_local_dir(str(ROOT / "prompts"), remote_path="/workspace/prompts")
 )
 secret = modal.Secret.from_name("motif-gepa-infron", required_keys=["INFRON_API_KEY"])
@@ -28,7 +29,7 @@ resume_retries = modal.Retries(initial_delay=0.0, max_retries=10)
 
 
 def dataset_dir(dataset: str) -> Path:
-    if dataset not in {"hrm8k_v1", "omni_v1", "omni_v2", "omni_v2_clean"}:
+    if dataset not in {"hrm8k_v1", "omni_v1", "omni_v2", "omni_v2_clean", "omni_v2_clean_curated"}:
         raise ValueError(f"Unknown dataset: {dataset}")
     return Path("/workspace/data") / dataset
 
@@ -46,7 +47,7 @@ def preflight_remote(dataset: str = "hrm8k_v1", language: str = "ko") -> dict:
     from motif_gepa_ko.settings import PROJECT_ROOT
 
     data_dir = dataset_dir(dataset)
-    is_v2 = dataset in {"omni_v2", "omni_v2_clean"}
+    is_v2 = dataset in {"omni_v2", "omni_v2_clean", "omni_v2_clean_curated"}
     prompt_dir = Path("/workspace/prompts/omni_v2") if is_v2 else Path("/workspace/prompts")
     seed, reflection = load_prompt_assets(prompt_dir, language)
     train = load_v2_split(data_dir, "train", language) if is_v2 else load_split(data_dir, "train")
@@ -66,7 +67,7 @@ def preflight_remote(dataset: str = "hrm8k_v1", language: str = "ko") -> dict:
         "artifact_schema_version": archive_probe["schema_version"],
         "code_files_hashed": len(archive_probe["code_sha256"]),
     }
-    if dataset in {"omni_v1", "omni_v2", "omni_v2_clean"}:
+    if dataset in {"omni_v1", "omni_v2", "omni_v2_clean", "omni_v2_clean_curated"}:
         sampler = OmniStratifiedBatchSampler(train, seed=0)
         gepa_train = as_v2_gepa_data(train) if is_v2 else as_gepa_data(train)
         selected = sampler.next_minibatch_ids(ListDataLoader(gepa_train), SimpleNamespace(i=0))
@@ -86,7 +87,7 @@ def optimize_remote(run_id: str, max_metric_calls: int, max_api_calls: int, mini
     try:
         return optimize_run(
             data_dir=dataset_dir(dataset),
-            prompts_dir=Path("/workspace/prompts/omni_v2") if dataset in {"omni_v2", "omni_v2_clean"} else Path("/workspace/prompts"),
+            prompts_dir=Path("/workspace/prompts/omni_v2") if dataset in {"omni_v2", "omni_v2_clean", "omni_v2_clean_curated"} else Path("/workspace/prompts"),
             runs_dir=Path("/results"),
             run_id=run_id,
             max_metric_calls=max_metric_calls,

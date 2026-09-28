@@ -12,13 +12,17 @@ from unittest.mock import patch
 from motif_gepa_ko.bilingual import (
     BilingualMathEvaluator, as_v2_gepa_data, load_v2_split, score_v2,
 )
-from motif_gepa_ko.translation import _translate_plain_chunks, mask_math, quality_flags, restore_math
+from motif_gepa_ko.translation import (
+    _translate_plain_chunks, _translate_prose_segments, mask_math,
+    quality_flags, restore_math,
+)
 from motif_gepa_ko.experiment import optimize_run
 from motif_gepa_ko.settings import Settings
 from scripts.review_omni_v2 import current_flags
 
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "omni_v2"
+CURATED_DATA = Path(__file__).resolve().parents[1] / "data" / "omni_v2_clean_curated"
 
 
 class OmniV2Tests(unittest.TestCase):
@@ -85,6 +89,17 @@ class OmniV2Tests(unittest.TestCase):
             self.assertEqual(score_v2("12", "Calculation.\nFINAL_ANSWER: 12", language)[0], 1.0)
             self.assertEqual(score_v2("12", "Calculation.\n정답: 12", language)[0], 0.0)
 
+    def test_curated_review_notes_do_not_change_reference_feedback(self):
+        for language in ("en", "ko"):
+            train = as_v2_gepa_data(load_v2_split(CURATED_DATA, "train", language))
+            by_id = {row["additional_context"]["question_id"]: row for row in train}
+            self.assertEqual(len(train), 1000)
+            self.assertEqual(sum("gold_solution" in row["additional_context"] for row in train), 1000)
+            self.assertIn("gold_solution", by_id["HRM8K:OMNI-MATH:1870"]["additional_context"])
+            feedback = BilingualMathEvaluator(language)(
+                by_id["HRM8K:OMNI-MATH:1870"], "FINAL_ANSWER: 0").feedback
+            self.assertIn(by_id["HRM8K:OMNI-MATH:1870"]["additional_context"]["gold_solution"], feedback)
+
     def test_math_is_restored_verbatim(self):
         source = r"First compute $x^2+1=5$. Then answer 2."
         masked, math = mask_math(source)
@@ -123,6 +138,47 @@ class OmniV2Tests(unittest.TestCase):
         )
         self.assertEqual(translated, "먼저 $2+2=4$을 계산한다.\n\n따라서 $x=4$이다.")
         self.assertEqual(len(requests), 2)
+
+    def test_segment_retry_preserves_math_when_model_only_translates_prose(self):
+        class FakeCompletions:
+            def create(self, **_kwargs):
+                content = json.dumps({"translations": [
+                    {"id": "0", "text": "먼저 계산한다"},
+                    {"id": "2", "text": ". 그런 다음"},
+                    {"id": "4", "text": "가 정답이다."},
+                ]}, ensure_ascii=False)
+                return SimpleNamespace(
+                    choices=[SimpleNamespace(message=SimpleNamespace(content=content))],
+                    id="fake", usage=None,
+                )
+
+        client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+        translated, requests = _translate_prose_segments(
+            client, Settings(api_key="fake"),
+            {"id": "example", "solution_en": "First compute $2+2=4$. Then $x=4$ is the answer."},
+        )
+        self.assertEqual(translated, "먼저 계산한다 $2+2=4$. 그런 다음 $x=4$ 가 정답이다.")
+        self.assertEqual(quality_flags("First compute $2+2=4$. Then $x=4$ is the answer.", translated), [])
+        self.assertEqual(len(requests), 1)
+
+    def test_segment_retry_recovers_from_invalid_json_batch(self):
+        replies = iter(("not JSON", "먼저 계산한다", ". 그런 다음", "가 정답이다."))
+
+        class FakeCompletions:
+            def create(self, **_kwargs):
+                return SimpleNamespace(
+                    choices=[SimpleNamespace(message=SimpleNamespace(content=next(replies)))],
+                    id="fake", usage=None,
+                )
+
+        client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+        translated, requests = _translate_prose_segments(
+            client, Settings(api_key="fake"),
+            {"id": "example", "solution_en": "First compute $2+2=4$. Then $x=4$ is the answer."},
+        )
+        self.assertEqual(translated, "먼저 계산한다 $2+2=4$. 그런 다음 $x=4$ 가 정답이다.")
+        self.assertEqual([item["status"] for item in requests],
+                         ["segment_batch_error", "segment_success", "segment_success", "segment_success"])
 
     def test_refresh_keeps_fallback_review_requirement(self):
         row = {"solution_ko": "둘과 둘을 더한다.",

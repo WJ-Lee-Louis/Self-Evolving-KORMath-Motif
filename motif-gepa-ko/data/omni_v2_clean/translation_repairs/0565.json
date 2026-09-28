@@ -1,0 +1,33 @@
+{
+  "id": "HRM8K:OMNI-MATH:0565",
+  "source_solution_sha256": "3b0ce08c149007e9a0287c57e7be287c5718529de73c97864de222dd6d5cc4f2",
+  "previous_quality_flags": [
+    "source_unbalanced_math_delimiter"
+  ],
+  "candidate_quality_flags": [
+    "source_unbalanced_math_delimiter",
+    "math_expression_mismatch"
+  ],
+  "candidate_solution_ko": "우리는 먼저 2와 3이 $100!=1 \\cdot 2 \\cdot 3 \\cdots 100$에 몇 번 나누어지는지 결정한다. \\langle N\\rangle_{n}$을 $N$을 $n$이 나누는 횟수라고 하자 (즉, 우리는 \\langle 100!\\rangle_{24}$을 구하고자 한다). 2는 짝수 정수에만 나누어 떨어지므로, \\langle 100!\\rangle_{2}=\\langle 2 \\cdot 4 \\cdot 6 \\cdots 100\\rangle$이다. 각 배수에서 2를 한 번 인수로 묶어내면, \\langle 100!\\rangle_{2}=\\left\\langle 2^{50} \\cdot 1 \\cdot 2 \\cdot 3 \\cdots 50\\right\\rangle_{2}$가 된다. 이 과정을 반복하면, \\langle 100!\\rangle_{2}=\\left\\langle 20^{50+25+12+6+3+1} \\cdot 1\\right\\rangle_{2}=97$임을 알 수 있다. 마찬가지로, \\langle 100!\\rangle_{3}=\\left\\langle 3^{33+11+3+1}\\right\\rangle_{3}=48$이다. 이제 $24=2^{3} \\cdot 3$이므로, 100! 안에 24의 각 인수가 존재하려면 100! 안에 2의 세 배수와 3의 한 배수가 필요하다. 따라서 \\langle 100!\\rangle_{24}=\\left(\\left[\\langle 100!\\rangle_{2} / 3\\right]+\\langle 100!\\rangle_{3}\\right)=32$, 여기서 $[N]$은 $N$보다 작거나 같은 최대 정수이다.",
+  "translator_model": "motif/motif-3",
+  "response_id": "chatcmpl-0d2e6b25-eb07-419e-8365-e94dfc35a05c",
+  "usage": {
+    "completion_tokens": 4901,
+    "prompt_tokens": 398,
+    "total_tokens": 5299,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": null,
+      "image_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    }
+  },
+  "seconds": 69.836
+}

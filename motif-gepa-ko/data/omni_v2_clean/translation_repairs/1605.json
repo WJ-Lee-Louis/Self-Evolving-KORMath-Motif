@@ -1,0 +1,34 @@
+{
+  "id": "HRM8K:OMNI-MATH:1605",
+  "source_solution_sha256": "e041534a1bd72289bf4de4341d60163f38b02db66876d9d7269771c3ebda9a75",
+  "previous_quality_flags": [
+    "source_unbalanced_math_delimiter"
+  ],
+  "candidate_quality_flags": [
+    "source_unbalanced_math_delimiter",
+    "math_expression_mismatch",
+    "new_prose_number"
+  ],
+  "candidate_solution_ko": "\\( x \\)를 Pat이 일한 일수라고 하자. 그가 일한 각각의 날에, 그는 100달러를 벌었고 음식 비용이 없었으므로, 그는 총 \\( 100x \\) 달러를 벌었다. Pat이 70일 중 \\( x \\)일 동안 일했으므로, 그는 \\( 70-x \\)일 동안 일하지 않았다. 이 각각의 날에, 그는 돈을 벌지 못했고 음식 값으로 20달러를 부과받았으므로, 음식 값으로 총 \\( 20(70-x) \\) 달러를 부과받았다. 70일 후, 그가 번 돈에서 음식 비용을 뺀 값은 5440달러였다. 대수적으로, 우리는 \\( 100x-20(70-x)=5440 \\)을 얻는다. 따라서, \\( 100x-1400+20x=5440 \\) 또는 \\( 120x=6840 \\)이며, 이는 \\( x=57 \\)을 준다. 따라서, Pat은 이 70일 중 57일 동안 일했다.",
+  "translator_model": "motif/motif-3",
+  "response_id": "chatcmpl-64a5494d-0fd6-47c8-bcb4-4ba8e3ccbd7b",
+  "usage": {
+    "completion_tokens": 1781,
+    "prompt_tokens": 309,
+    "total_tokens": 2090,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": null,
+      "image_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    }
+  },
+  "seconds": 26.504
+}

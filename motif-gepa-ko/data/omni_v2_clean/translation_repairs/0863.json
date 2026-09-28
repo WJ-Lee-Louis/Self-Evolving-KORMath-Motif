@@ -1,0 +1,35 @@
+{
+  "id": "HRM8K:OMNI-MATH:0863",
+  "source_solution_sha256": "046ae682f537df6a32c7573ff7b41bd01579e556ff8e740a4b7a303e9defcf14",
+  "previous_quality_flags": [
+    "source_unbalanced_math_delimiter"
+  ],
+  "candidate_quality_flags": [
+    "source_unbalanced_math_delimiter",
+    "math_expression_mismatch",
+    "missing_prose_number",
+    "new_prose_number"
+  ],
+  "candidate_solution_ko": "우리는 여집합을 이용한 계수법을 사용합니다. 총 함수의 개수는 $5^{5}=3125$개입니다. 만약 서로 매핑되는 숫자 쌍이 적어도 하나 존재한다면, 그 쌍을 선택하는 방법은 $\\binom{5}{2}=10$가지이고, 함수의 다른 값들을 할당하는 방법은 $5^{3}=125$가지이므로 총 $1250$가지입니다. 하지만 이러한 쌍이 두 개 있을 때마다 중복 계산이 발생하므로, $5 \\cdot 3 \\cdot 5=75$를 빼야 합니다. 여기서 5는 쌍에 포함되지 않은 숫자를 선택하는 방법의 수, 3은 나머지 네 숫자를 짝짓는 방법의 수, 5는 짝이 없는 숫자가 입력될 때 함수의 출력값을 선택하는 방법의 수입니다. 따라서 최종 답은 $3125-(1250-75)=1950$입니다.",
+  "translator_model": "motif/motif-3",
+  "response_id": "chatcmpl-964027e2-5c97-4ccc-bcbb-ccd47c5f8962",
+  "usage": {
+    "completion_tokens": 1875,
+    "prompt_tokens": 286,
+    "total_tokens": 2161,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": null,
+      "image_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    }
+  },
+  "seconds": 26.88
+}

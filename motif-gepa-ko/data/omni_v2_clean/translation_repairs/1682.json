@@ -1,0 +1,34 @@
+{
+  "id": "HRM8K:OMNI-MATH:1682",
+  "source_solution_sha256": "ccd1efe113e5aa534a51e8609cbe583c04354e215d896bf0511e7059d6231793",
+  "previous_quality_flags": [
+    "source_unbalanced_math_delimiter"
+  ],
+  "candidate_quality_flags": [
+    "source_unbalanced_math_delimiter",
+    "math_expression_mismatch",
+    "missing_prose_number"
+  ],
+  "candidate_solution_ko": "첫 번째 해법:\nS를 원하는 합이라고 하자. 우리는 S=1임을 증명할 것이다.\n다음과 같이 쓰자: \\[ \\sum_{n=0}^\\infty \\frac{1}{k2^n+1} = \\frac{1}{k+1} + \\sum_{n=1}^\\infty \\frac{1}{k2^n+1}; \\] 그러면 우리는 S = S_1 + S_2로 쓸 수 있으며, 여기서 \\[ S_1 = \\sum_{k=1}^\\infty \\frac{(-1)^{k-1}}{k(k+1)} \\] \\[ S_2 = \\sum_{k=1}^\\infty \\frac{(-1)^{k-1}}{k} \\sum_{n=1}^\\infty \\frac{1}{k2^n+1}. \\] 이 재배열은 S_1과 S_2가 k에 대해 절대수렴하므로, 1/k^2의 합과 비교하여 유효하다. S_1을 계산하기 위해, 다음을 주목하자: \\[ \\sum_{k=1}^N \\frac{(-1)^{k-1}}{k(k+1)} = \\sum_{k=1}^N  (-1)^{k-1}\\left(\\frac{1}{k}-\\frac{1}{k+1} \\right) = -1+\\frac{(-1)^N}{N+1}+2\\sum_{k=1}^N \\frac{(-1)^{k-1}}{k} \\] N→∞일 때 2\\ln 2 - 1로 수렴하므로, S_1 = 2\\ln 2 - 1이다. S_2를 계산하기 위해, \\frac{1}{k2^n+1} = \\frac{1}{k2^n}\\cdot \\frac{1}{1+1/(k2^n)}를 기하급수 \\sum_{m=0}^\\infty \\frac{(-1)^m}{k^{m+1} 2^{mn+n}}로 쓰면, 따라서 \\[ S_2 = \\sum_{k=1}^\\infty \\sum_{n=1}^\\infty \\sum_{m=0}^\\infty \\frac{(-1)^{k+m-1}}{k^{m+2} 2^{mn+n}}. \\] (이 단계는 n ≥ 1을 필요로 하는데, 그렇지 않으면 기하급수가 k=0에 대해 수렴하지 않기 때문이다.) 이제 이 삼중합이 절대수렴함을 주목하자: 우리는 \\[ \\sum_{m=0}^\\infty \\frac{1}{k^{m+2} 2^{mn+n}} = \\frac{1}{k^2 2^n} \\cdot \\frac{1}{1-\\frac{1}{k 2^n}} = \\frac{1}{k(k2^n-1)} \\leq \\frac{1}{k^2 2^{n-1}} \\]를 가지며, 따라서 \\[ \\sum_{k=1}^\\infty \\sum_{n=1}^\\infty \\sum_{m=0}^\\infty \\frac{1}{k^{m+2} 2^{mn+n}} \\leq \\sum_{k=1}^\\infty \\sum_{n=1}^\\infty  \\frac{1}{k^2 2^{n-1}} = \\sum_{k=1}^\\infty \\frac{2}{k^2} < \\infty. \\] 따라서 우리는 합을 재배열하여 다음을 얻을 수 있다: \\[ S_2 = \\sum_{m=0}^\\infty (-1)^m \\left( \\sum_{n=1}^\\infty \\frac{1}{2^{mn+n}}\\right) \\left(\\sum_{k=1}^\\infty \\frac{(-1)^{k-1}}{k^{m+2}} \\right). \\] n에 대한 합은 기하급수이며, \\[ \\frac{1}{2^{m+1}(1-\\frac{1}{2^{m+1}})} = \\frac{1}{2^{m+1}-1}. \\] k에 대한 합을 S_3라고 쓰면, 다음을 주목하자: \\[ \\sum_{k=1}^\\infty \\frac{1}{k^{m+2}} = S_3 + 2 \\sum_{k=1}^\\infty \\frac{1}{(2k)^{m+2}} = S_3 + \\frac{1}{2^{m+1}} \\sum_{k=1}^\\infty \\frac{1}{k^{m+2}} \\] (첫 번째 등식에서 항을 재배열할 수 있는 이유는 모든 급수가 절대수렴하기 때문이다), 따라서 \\[ S_3 = \\left(1-\\frac{1}{2^{m+1}}\\right)  \\sum_{k=1}^\\infty \\frac{1}{k^{m+2}}. \\] 따라서 \\[ S_2 = \\sum_{m=0}^\\infty \\frac{(-1)^m}{2^{m+1}} \\sum_{k=1}^\\infty \\frac{1}{k^{m+2}} = \\sum_{k=1}^\\infty \\frac{1}{2k^2} \\sum_{m=0}^\\infty \\left(-\\frac{1}{2k}\\right)^m = \\sum_{k=1}^\\infty \\frac{1}{k(2k+1)} = 2 \\sum_{k=1}^\\infty \\left( \\frac{1}{2k} - \\frac{1}{2k+1} \\right) = 2(1-\\ln 2). \\] 마지막으로, S = S_1 + S_2 = 1이다.\n\n두 번째 해법: (Tewodros Amdeberhan에 의해) 임의의 t ≥ 1에 대해 \\int_0^1 x^t\\,dx = \\frac{1}{1+t}이므로, 우리는 또한 \\[ S = \\sum_{k=1}^\\infty  \\sum_{n=0}^\\infty \\frac{(-1)^{k-1}}{k} \\int_0^1 x^{k2^n}\\,dx. \\] 다시 절대수렴에 의해, 우리는 적분과 합을 자유롭게 바꿀 수 있다: \\[ S = \\int_0^1 dx\\, \\sum_{n=0}^\\infty \\sum_{k=1}^\\infty \\frac{(-1)^{k-1}}{k} x^{k2^n} = \\int_0^1 dx\\, \\sum_{n=0}^\\infty \\log (1 + x^{2^n}). \\] 음이 아닌 정수의 이진 전개의 유일성 때문에, 우리는 형식적 멱급수의 항등식 \\[ \\frac{1}{1 - x} = \\prod_{n=0}^\\infty (1 + x^{2^n}); \\]를 가지며, 이 곱은 0 ≤ x < 1에서 절대수렴한다. 따라서 우리는 \\[ S = -\\int_0^1 \\log (1-x)\\,dx = \\left((1-x) \\log (1-x) - (1-x)\\right)_0^1 = 1. \\]\n\n세 번째 해법: (Serin Hong에 의해) 다시 절대수렴을 사용하여, 우리는 \\[ S = \\sum_{m=2}^\\infty \\frac{1}{m} \\sum_{k} \\frac{(-1)^{k-1}}{k} \\]로 쓸 수 있으며, 여기서 k는 어떤 n에 대해 m = k2^n+1인 모든 양의 정수에 대해 변한다. 만약 우리가 m-1의 2-진 값 e와 m-1의 홀수 부분 j = (m-1)2^{-e}로 쓰면, k의 값은 i=0,...,e에 대해 j 2^i이다. 따라서 내부 합은 다음과 같이 계산될 수 있다: \\[ \\frac{1}{j} - \\sum_{i=1}^e \\frac{1}{2^i j} = \\frac{1}{2^e j} = \\frac{1}{m-1}. \\] 따라서 우리는 \\[ S = \\sum_{m=2}^\\infty \\frac{1}{m(m-1)} = \\sum_{m=2}^\\infty \\left( \\frac{1}{m-1} - \\frac{1}{m} \\right) = 1. \\]\n\n네 번째 해법: (Liang Xiao에 의해) S_0와 S_1을 각각 k가 모든 양의 홀수와 모든 양의 짝수에 대해 변하는 합 \\sum_k \\frac{1}{k} \\sum_{n=0}^\\infty \\frac{1}{k2^n+1}이라고 하면, \\[ S = S_0 - S_1. \\] S_1에서, 우리는 k = 2\\ell로 써서 \\[ S_1 = \\sum_{\\ell=1}^\\infty \\frac{1}{2\\ell} \\sum_{n=0}^\\infty \\frac{1}{\\ell 2^{n+1} + 1} = \\frac{1}{2} (S_0 + S_1) - \\sum_{\\ell=1}^\\infty \\frac{1}{2\\ell(\\ell+1)} = \\frac{1}{2} (S_0 + S_1) - \\frac{1}{2} \\]를 얻으며, 마지막 합이 망원급수이기 때문에, 이는 즉시 S = 1을 준다.",
+  "translator_model": "motif/motif-3",
+  "response_id": "chatcmpl-0cb1a5b7-fb19-4781-98fb-dd7be7593f28",
+  "usage": {
+    "completion_tokens": 10900,
+    "prompt_tokens": 2000,
+    "total_tokens": 12900,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": null,
+      "image_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    }
+  },
+  "seconds": 158.408
+}

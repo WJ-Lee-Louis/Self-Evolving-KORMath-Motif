@@ -1,0 +1,100 @@
+{
+  "dataset_version": "omni_v2_clean_curated",
+  "parent_dataset_version": "omni_v2_clean",
+  "parent_manifest_sha256": "a8d931eca8fdea3a686cf6b5b452a01f77036a18cf4bf4e76ea7c902c4ea7240",
+  "split_policy": "same IDs, order, difficulty labels and answers as parent",
+  "files": {
+    "train.jsonl": {
+      "rows": 1000,
+      "sha256": "fbb065b41dcb5127f15653849d34c80061e54c224c051d82ab08b0c28c589426"
+    },
+    "val.jsonl": {
+      "rows": 50,
+      "sha256": "c31ca29909737a2dd67fd867b6f87de0a2a7cbbfd66b297c674921cfd87ffd6e"
+    },
+    "test_id.jsonl": {
+      "rows": 760,
+      "sha256": "5dbdac38d060924fd45270e1061b909941b4e9977b16a48b6dd8149502a01b0f"
+    },
+    "train_solutions_ko.jsonl": {
+      "rows": 1000,
+      "sha256": "568579e0ea41ff02120ded9be75b269a42eabe4d75ca4437ab78fa70771e39ab"
+    },
+    "text_repairs.jsonl": {
+      "rows": 99,
+      "sha256": "92832429fdbb0c1950da594597a278287a03d1dfa865ce7f1b22f8e30968e50a"
+    },
+    "source_solution_issues.jsonl": {
+      "rows": 18,
+      "sha256": "92302b23905b6f8190041f12ba08bac0bf97bf68c202c49553d79cb914a649ae"
+    }
+  },
+  "splits": {
+    "train": {
+      "rows": 1000,
+      "sha256": "fbb065b41dcb5127f15653849d34c80061e54c224c051d82ab08b0c28c589426"
+    },
+    "val": {
+      "rows": 50,
+      "sha256": "c31ca29909737a2dd67fd867b6f87de0a2a7cbbfd66b297c674921cfd87ffd6e"
+    },
+    "test_id": {
+      "rows": 760,
+      "sha256": "5dbdac38d060924fd45270e1061b909941b4e9977b16a48b6dd8149502a01b0f"
+    }
+  },
+  "cleaned_pool_rows": 1810,
+  "forced_test_multi_match_source_rows": [
+    1358,
+    1361,
+    1362,
+    1441,
+    1443,
+    1467,
+    1472,
+    1473,
+    1475,
+    1480,
+    1492,
+    1500,
+    1502,
+    1541,
+    1720,
+    1737
+  ],
+  "text_repair_counts": {
+    "solution_en_times": 103,
+    "question_en_frac": 25,
+    "solution_en_frac": 118,
+    "question_en_times": 19,
+    "question_en_first": 1,
+    "question_en_find": 1,
+    "question_en_plain_tabs": 2,
+    "question_en_triangle": 1,
+    "solution_en_triangle": 9,
+    "solution_ko_times": 73,
+    "solution_ko_frac": 39
+  },
+  "reference_review_note_ids": [
+    "HRM8K:OMNI-MATH:0020",
+    "HRM8K:OMNI-MATH:0844",
+    "HRM8K:OMNI-MATH:1010",
+    "HRM8K:OMNI-MATH:1776",
+    "HRM8K:OMNI-MATH:1780",
+    "HRM8K:OMNI-MATH:1789",
+    "HRM8K:OMNI-MATH:1798",
+    "HRM8K:OMNI-MATH:1814",
+    "HRM8K:OMNI-MATH:1818",
+    "HRM8K:OMNI-MATH:1827",
+    "HRM8K:OMNI-MATH:1832",
+    "HRM8K:OMNI-MATH:1847",
+    "HRM8K:OMNI-MATH:1849",
+    "HRM8K:OMNI-MATH:1855",
+    "HRM8K:OMNI-MATH:1870",
+    "HRM8K:OMNI-MATH:1883",
+    "HRM8K:OMNI-MATH:1897",
+    "HRM8K:OMNI-MATH:1898"
+  ],
+  "reference_review_note_count": 18,
+  "caveat": "Review notes include incomplete derivations and possible inconsistencies. They do not automatically suppress or rewrite source solutions."
+}

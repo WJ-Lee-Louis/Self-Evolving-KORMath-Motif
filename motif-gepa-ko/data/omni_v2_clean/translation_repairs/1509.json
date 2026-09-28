@@ -1,0 +1,33 @@
+{
+  "id": "HRM8K:OMNI-MATH:1509",
+  "source_solution_sha256": "43902706752db712a53d9319a635f2bf51e7df2a5528a5545e4af8bd9ba72dc9",
+  "previous_quality_flags": [
+    "source_unbalanced_math_delimiter"
+  ],
+  "candidate_quality_flags": [
+    "source_unbalanced_math_delimiter",
+    "math_expression_mismatch"
+  ],
+  "candidate_solution_ko": "원래의 $5 \\times 5 \\times 5$ 정육면체는 6개의 면을 가지며, 각 면은 $5 \\times 5$이다. 세 개의 중앙 기둥이 제거될 때, 각 면에서 '1 \\times 1$ 정사각형' 중 하나가 제거된다. 이는 각 면의 표면적이 1만큼 감소하여 $5 \\times 5 - 1 = 24$가 됨을 의미한다. 이는 정육면체의 전체 외부 표면적이 $6 \\times 24 = 144$임을 의미한다. 각 중앙 기둥이 제거될 때, 길이가 5개의 단위 정육면체인 '관'이 생성된다. 이러한 각 관은 $5 \\times 1 \\times 1$이다. 원래의 $5 \\times 5 \\times 5$ 정육면체의 중심 정육면체가 세 개의 중앙 기둥 각각이 제거될 때 제거되므로, 이는 세 개의 $5 \\times 1 \\times 1$ 관 각각이 두 개의 $2 \\times 1 \\times 1$ 관으로 분할됨을 의미한다. 이러한 각 관의 내부 표면적은 네 개의 면으로 구성되며, 각 면은 $2 \\times 1$이다. (우리는 대신 $2 \\times 1 \\times 1$ 직육면체의 외부 표면적을 생각할 수 있으며, 그 정사각형 끝부분은 무시한다.) 따라서, 각각 $2 \\times 1$인 4개의 면을 가진 6개의 관에서 나오는 내부 표면적은 총 면적이 $6 \\times 4 \\times 2 \\times 1 = 48$이 된다. 전체적으로, 결과 고체의 표면적은 $144 + 48 = 192$이다.",
+  "translator_model": "motif/motif-3",
+  "response_id": "chatcmpl-b16ed1a6-faee-4cfb-ba50-98f1c39600f1",
+  "usage": {
+    "completion_tokens": 2892,
+    "prompt_tokens": 438,
+    "total_tokens": 3330,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": null,
+      "image_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    }
+  },
+  "seconds": 40.761
+}

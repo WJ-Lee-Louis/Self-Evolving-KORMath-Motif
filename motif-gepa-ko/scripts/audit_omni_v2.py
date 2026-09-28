@@ -1,5 +1,6 @@
 """Report split integrity and Korean training-solution translation progress."""
 
+import argparse
 from collections import Counter
 import hashlib
 import json
@@ -7,7 +8,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "omni_v2"
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -15,11 +15,15 @@ def read_jsonl(path: Path) -> list[dict]:
 
 
 def main() -> None:
-    manifest = json.loads((DATA / "manifest.json").read_text(encoding="utf-8"))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", choices=("omni_v2", "omni_v2_clean", "omni_v2_clean_curated"), default="omni_v2")
+    args = parser.parse_args()
+    data = ROOT / "data" / args.dataset
+    manifest = json.loads((data / "manifest.json").read_text(encoding="utf-8"))
     seen = set()
     splits = {}
     for split in ("train", "val", "test_id"):
-        path = DATA / f"{split}.jsonl"
+        path = data / f"{split}.jsonl"
         records = read_jsonl(path)
         expected = manifest["splits"][split]
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected["sha256"]:
@@ -29,9 +33,9 @@ def main() -> None:
             raise ValueError(f"Count or ID overlap failure: {split}")
         seen.update(ids)
         splits[split] = records
-    if len(seen) != 1818:
+    if len(seen) != manifest["cleaned_pool_rows"]:
         raise ValueError("Incomplete cleaned pool")
-    translation_path = DATA / "train_solutions_ko.jsonl"
+    translation_path = data / "train_solutions_ko.jsonl"
     translated = read_jsonl(translation_path) if translation_path.exists() else []
     train_by_id = {row["id"]: row for row in splits["train"]}
     translated_ids = set()
@@ -55,6 +59,8 @@ def main() -> None:
         "remaining_train": len(train_by_id) - len(translated),
         "quality_flags": dict(flags),
         "pending_review": pending_review,
+        "untrusted_references": sum(row.get("reference_solution_status") == "untrusted"
+                                    for row in splits["train"]),
         "translation_ready": len(translated) == 1000 and pending_review == 0,
     }, ensure_ascii=False, indent=2))
 

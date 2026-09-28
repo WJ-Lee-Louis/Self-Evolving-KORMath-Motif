@@ -11,7 +11,7 @@ import re
 import time
 from typing import Callable
 
-from openai import OpenAI
+from openai import APIConnectionError, APITimeoutError, InternalServerError, OpenAI
 
 from motif_gepa_ko.settings import Settings
 
@@ -148,6 +148,133 @@ def _translate_plain_chunks(client: OpenAI, settings: Settings, item: dict) -> t
     return restore_math("\n\n".join(outputs), expressions), requests
 
 
+def _translate_prose_segments(client: OpenAI, settings: Settings, item: dict) -> tuple[str, list[dict]]:
+    """Keep every math span locally and ask Motif to translate only prose spans.
+
+    This is the last fallback when a model cannot preserve math placeholders in
+    a long paragraph. Small batches use JSON; each failed batch is retried as
+    independent plain-text requests so a single bad segment does not spoil all.
+    """
+    masked, expressions = mask_math(item["solution_en"])
+    parts = re.split(r"(\[\[MATH_\d+\]\])", masked)
+    indices = [index for index, part in enumerate(parts)
+               if not re.fullmatch(r"\[\[MATH_\d+\]\]", part) and re.search(r"[A-Za-z]", part)]
+    requests: list[dict] = []
+
+    def preserve_space(index: int, translated: str) -> str:
+        original = parts[index]
+        return (re.match(r"^\s*", original).group()
+                + translated.strip()
+                + re.search(r"\s*$", original).group())
+
+    def plain(index: int) -> str:
+        started = time.perf_counter()
+        response = client.chat.completions.create(
+            model=settings.model,
+            messages=[
+                {"role": "system", "content": (
+                    "Translate the supplied English mathematical prose into Korean. "
+                    "Return only its translation. Keep all numerical values and "
+                    "do not add or remove a mathematical step."
+                )},
+                {"role": "user", "content": parts[index]},
+            ],
+            temperature=0,
+            max_completion_tokens=min(settings.max_output_tokens, 4096),
+            extra_body={"usage": {"include": True}},
+        )
+        content = response.choices[0].message.content if response.choices else None
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError(f"Empty prose segment translation {index}")
+        requests.append({"status": "segment_success", "ids": [item["id"]],
+                         "segment_index": index, "response_id": response.id,
+                         "usage": response.usage.model_dump(mode="json") if response.usage else None,
+                         "seconds": round(time.perf_counter() - started, 3)})
+        return preserve_space(index, content)
+
+    for start in range(0, len(indices), 5):
+        group = indices[start:start + 5]
+        payload = [{"id": str(index), "text": parts[index]} for index in group]
+        started = time.perf_counter()
+        try:
+            response = client.chat.completions.create(
+                model=settings.model,
+                messages=[
+                    {"role": "system", "content": (
+                        "Translate each English mathematical prose text into Korean. "
+                        "Keep every numerical value. Return JSON with a 'translations' "
+                        "array of objects containing exactly 'id' and 'text'. "
+                        "Do not solve the problem or add steps."
+                    )},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                temperature=0,
+                max_completion_tokens=min(settings.max_output_tokens, 4096),
+                extra_body={"usage": {"include": True}},
+            )
+            content = response.choices[0].message.content if response.choices else None
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError("Empty batch of prose segment translations")
+            translated = _json_object(content)["translations"]
+            if (not isinstance(translated, list) or len(translated) != len(group)
+                    or {x["id"] for x in translated} != {str(x) for x in group}):
+                raise ValueError("Segment translation IDs do not match")
+            by_id = {x["id"]: x["text"] for x in translated}
+            if not all(isinstance(by_id[str(x)], str) and by_id[str(x)].strip() for x in group):
+                raise ValueError("Empty segment translation")
+            for index in group:
+                parts[index] = preserve_space(index, by_id[str(index)])
+            requests.append({"status": "segment_batch_success", "ids": [item["id"]],
+                             "segment_indices": group, "response_id": response.id,
+                             "usage": response.usage.model_dump(mode="json") if response.usage else None,
+                             "seconds": round(time.perf_counter() - started, 3)})
+        except Exception as exc:
+            requests.append({"status": "segment_batch_error", "ids": [item["id"]],
+                             "segment_indices": group, "error_type": type(exc).__name__,
+                             "error": str(exc)[:500],
+                             "seconds": round(time.perf_counter() - started, 3)})
+            for index in group:
+                parts[index] = plain(index)
+    return restore_math("".join(parts), expressions), requests
+
+
+def _translate_whole_plain(client: OpenAI, settings: Settings, item: dict) -> tuple[str, list[dict]]:
+    """Translate the complete source without masking equations; review the result."""
+    started = time.perf_counter()
+    response = client.chat.completions.create(
+        model=settings.model,
+        messages=[
+            {"role": "system", "content": (
+                "Translate every English prose sentence in the supplied math solution "
+                "into Korean. Return only the complete Korean translation. "
+                "Copy all mathematical expressions, variables, numerical values, "
+                "and LaTeX commands exactly, even if the source has broken or "
+                "unbalanced math delimiters. Do not solve the problem again, "
+                "omit any step, or add new reasoning. Do not leave English prose "
+                "untranslated."
+            )},
+            {"role": "user", "content": (
+                f"Problem: {item['question_en']}\n\n"
+                f"Reference solution to translate:\n{item['solution_en']}"
+            )},
+        ],
+        temperature=0,
+        max_completion_tokens=min(settings.max_output_tokens, 12000),
+        extra_body={"usage": {"include": True}},
+    )
+    content = response.choices[0].message.content if response.choices else None
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("Empty whole-solution translation")
+    if re.search(r"[A-Za-z]", item["solution_en"]) and not re.search(r"[가-힣]", content):
+        raise ValueError("No Korean prose in whole-solution translation")
+    return content.strip(), [{
+        "status": "whole_plain_success", "ids": [item["id"]],
+        "response_id": response.id,
+        "usage": response.usage.model_dump(mode="json") if response.usage else None,
+        "seconds": round(time.perf_counter() - started, 3),
+    }]
+
+
 def translate_train(
     train_path: Path,
     output_path: Path,
@@ -156,6 +283,8 @@ def translate_train(
     batch_size: int = 2,
     batch_chars: int = 5500,
     checkpoint: Callable[[], None] | None = None,
+    prefer_segments: bool = False,
+    prefer_full_plain: bool = False,
 ) -> dict:
     if batch_size < 1 or batch_chars < 1 or max_records < 0:
         raise ValueError("Invalid translation batch settings")
@@ -166,13 +295,63 @@ def translate_train(
     done = _load_done(output_path, by_id)
     settings = Settings.from_env()
     client = OpenAI(api_key=settings.api_key, base_url=settings.base_url,
-                    timeout=settings.timeout_seconds, max_retries=2)
+                    timeout=settings.timeout_seconds, max_retries=0)
     requests_path = output_path.with_name("translation_requests.jsonl")
     failures_path = output_path.with_name("translation_failures.jsonl")
     completed_now = 0
 
     def send_batch(batch: list[dict]) -> None:
         nonlocal completed_now
+        if prefer_full_plain and len(batch) == 1:
+            item = batch[0]
+            try:
+                restored, whole_requests = _translate_whole_plain(client, settings, item)
+                whole_row = {
+                    "id": item["id"], "solution_ko": restored,
+                    "source_solution_sha256": hashlib.sha256(item["solution_en"].encode("utf-8")).hexdigest(),
+                    "quality_flags": [*quality_flags(item["solution_en"], restored), "fallback_translation"],
+                    "translator_model": settings.model,
+                    "translation_strategy": "whole_plain_translation",
+                }
+                _append_lines(output_path, [whole_row])
+                _append_lines(requests_path, whole_requests)
+                completed_now += 1
+                if checkpoint:
+                    checkpoint()
+                print(f"Translated whole solution {len(done) + completed_now}/{len(records)}", flush=True)
+                return
+            except Exception as whole_exc:
+                _append_lines(requests_path, [{
+                    "status": "whole_plain_error", "ids": [item["id"]],
+                    "error_type": type(whole_exc).__name__, "error": str(whole_exc)[:500],
+                }])
+                if checkpoint:
+                    checkpoint()
+        if prefer_segments and len(batch) == 1:
+            item = batch[0]
+            try:
+                restored, segment_requests = _translate_prose_segments(client, settings, item)
+                segment_row = {
+                    "id": item["id"], "solution_ko": restored,
+                    "source_solution_sha256": hashlib.sha256(item["solution_en"].encode("utf-8")).hexdigest(),
+                    "quality_flags": [*quality_flags(item["solution_en"], restored), "fallback_translation"],
+                    "translator_model": settings.model,
+                    "translation_strategy": "prose_segments_fallback",
+                }
+                _append_lines(output_path, [segment_row])
+                _append_lines(requests_path, segment_requests)
+                completed_now += 1
+                if checkpoint:
+                    checkpoint()
+                print(f"Translated with segment strategy {len(done) + completed_now}/{len(records)}", flush=True)
+                return
+            except Exception as segment_exc:
+                _append_lines(requests_path, [{
+                    "status": "segment_strategy_error", "ids": [item["id"]],
+                    "error_type": type(segment_exc).__name__, "error": str(segment_exc)[:500],
+                }])
+                if checkpoint:
+                    checkpoint()
         payload = []
         expressions_by_id = {}
         for item in batch:
@@ -229,7 +408,8 @@ def translate_train(
             }])
             if checkpoint:
                 checkpoint()
-            if not isinstance(exc, (ValueError, KeyError, TypeError)):
+            if not isinstance(exc, (ValueError, KeyError, TypeError,
+                                    APITimeoutError, APIConnectionError, InternalServerError)):
                 raise
             if len(batch) == 1:
                 item = batch[0]
@@ -253,6 +433,27 @@ def translate_train(
                     _append_lines(requests_path, [{
                         "status": "fallback_error", "ids": [item["id"]],
                         "error_type": type(fallback_exc).__name__, "error": str(fallback_exc)[:500],
+                    }])
+                try:
+                    restored, segment_requests = _translate_prose_segments(client, settings, item)
+                    output = [{
+                        "id": item["id"], "solution_ko": restored,
+                        "source_solution_sha256": hashlib.sha256(item["solution_en"].encode("utf-8")).hexdigest(),
+                        "quality_flags": [*quality_flags(item["solution_en"], restored), "fallback_translation"],
+                        "translator_model": settings.model,
+                        "translation_strategy": "prose_segments_fallback",
+                    }]
+                    _append_lines(output_path, output)
+                    _append_lines(requests_path, segment_requests)
+                    completed_now += 1
+                    if checkpoint:
+                        checkpoint()
+                    print(f"Translated with segment fallback {len(done) + completed_now}/{len(records)}", flush=True)
+                    return
+                except Exception as segment_exc:
+                    _append_lines(requests_path, [{
+                        "status": "segment_fallback_error", "ids": [item["id"]],
+                        "error_type": type(segment_exc).__name__, "error": str(segment_exc)[:500],
                     }])
                 _append_lines(failures_path, [{
                     "id": batch[0]["id"], "error_type": type(exc).__name__,

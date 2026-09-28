@@ -1,0 +1,16 @@
+{
+  "dataset": "omni_v2_clean",
+  "rows_checked": 1000,
+  "finding_counts": {
+    "math_span_change": 40,
+    "latin_prose_candidate": 26,
+    "known_source_solution_issue": 18,
+    "inherited_source_math_delimiter": 7,
+    "number_set_change": 56,
+    "source_omits_final_answer_value": 74,
+    "english_source_control_character": 28,
+    "korean_solution_control_character": 27
+  },
+  "report": "translation_audit.jsonl",
+  "scope": "structural full-coverage; semantic and mathematical review is separate"
+}

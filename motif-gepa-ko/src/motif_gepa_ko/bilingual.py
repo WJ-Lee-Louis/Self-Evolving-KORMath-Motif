@@ -14,7 +14,7 @@ from motif_gepa_ko.data import load_split
 
 
 LANGUAGES = ("ko", "en")
-V2_DATASETS = ("omni_v2", "omni_v2_clean")
+V2_DATASETS = ("omni_v2", "omni_v2_clean", "omni_v2_clean_curated")
 FINAL_LINE = re.compile(
     r"^\s*FINAL_ANSWER\s*:\s*([+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*\.?\s*$"
 )
@@ -97,18 +97,22 @@ def score_v2(answer: str, response: str, language: str,
         if parsed is None:
             feedback = f"마지막 줄에서 `FINAL_ANSWER: 정수` 형식을 찾지 못했습니다. 정답은 {answer}입니다."
         elif score:
-            feedback = "최종 답이 맞습니다. 풀이가 모범해설과 일치하는지 살펴보세요."
+            feedback = ("최종 답이 맞습니다. 풀이가 모범해설과 일치하는지 살펴보세요."
+                        if gold_solution else "최종 답이 맞습니다. 풀이를 다시 점검하세요.")
         else:
-            feedback = f"최종 답 {parsed}은 오답이고 정답은 {answer}입니다. 풀이를 모범해설과 비교하세요."
+            feedback = (f"최종 답 {parsed}은 오답이고 정답은 {answer}입니다. 풀이를 모범해설과 비교하세요."
+                        if gold_solution else f"최종 답 {parsed}은 오답이고 정답은 {answer}입니다. 풀이를 다시 점검하세요.")
         if gold_solution:
             feedback += f"\n모범해설:\n{gold_solution}"
     else:
         if parsed is None:
             feedback = f"The final line did not match `FINAL_ANSWER: integer`. The correct answer is {answer}."
         elif score:
-            feedback = "The final answer is correct. Compare the reasoning with the reference solution."
+            feedback = ("The final answer is correct. Compare the reasoning with the reference solution."
+                        if gold_solution else "The final answer is correct. Review the reasoning.")
         else:
-            feedback = f"The final answer {parsed} is incorrect; the correct answer is {answer}. Compare the reasoning with the reference solution."
+            feedback = (f"The final answer {parsed} is incorrect; the correct answer is {answer}. Compare the reasoning with the reference solution."
+                        if gold_solution else f"The final answer {parsed} is incorrect; the correct answer is {answer}. Review the reasoning.")
         if gold_solution:
             feedback += f"\nReference solution:\n{gold_solution}"
     return score, feedback, str(parsed) if parsed is not None else None
