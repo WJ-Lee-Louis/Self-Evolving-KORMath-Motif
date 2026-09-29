@@ -105,7 +105,8 @@ def optimize_remote(run_id: str, max_metric_calls: int, max_api_calls: int, mini
 @app.function(image=image, secrets=[secret], volumes={"/results": volume}, timeout=86400,
               retries=resume_retries, cpu=0.5, memory=1024)
 def evaluate_remote(run_id: str, split: str, limit: int, max_api_calls: int,
-                    dataset: str = "hrm8k_v1", language: str = "ko") -> dict:
+                    dataset: str = "hrm8k_v1", language: str = "ko",
+                    selection_policy: str = "gepa") -> dict:
     from motif_gepa_ko.experiment import evaluate_run
 
     volume.reload()
@@ -118,6 +119,7 @@ def evaluate_remote(run_id: str, split: str, limit: int, max_api_calls: int,
             limit=limit,
             max_api_calls=max_api_calls,
             language=language,
+            selection_policy=selection_policy,
             checkpoint_hook=volume.commit,
         )
     finally:
@@ -146,5 +148,7 @@ def optimize(
 
 @app.local_entrypoint()
 def evaluate(run_id: str, split: str, limit: int = 20, max_api_calls: int = 100,
-             dataset: str = "hrm8k_v1", language: str = "ko") -> None:
-    print(evaluate_remote.spawn(run_id, split, limit, max_api_calls, dataset, language).get())
+             dataset: str = "hrm8k_v1", language: str = "ko",
+             selection_policy: str = "gepa") -> None:
+    print(evaluate_remote.spawn(run_id, split, limit, max_api_calls, dataset, language,
+                                selection_policy).get())

@@ -1,6 +1,7 @@
 """Reproducible GEPA search and held-out prompt comparison."""
 
 import difflib
+import importlib.util
 import json
 import re
 import time
@@ -777,12 +778,15 @@ def evaluate_run(
     limit: int = 20,
     max_api_calls: int = 100,
     language: str | None = None,
+    selection_policy: str = "gepa",
     checkpoint_hook: Callable[[], None] | None = None,
 ) -> dict:
     if not split.startswith("test_"):
         raise ValueError("보류 평가에는 test_* 분할만 사용할 수 있습니다.")
     if limit < 0 or max_api_calls < 2:
         raise ValueError("limit >= 0, max_api_calls >= 2여야 합니다.")
+    if selection_policy not in {"gepa", "latest_val_tie"}:
+        raise ValueError("selection_policy must be gepa or latest_val_tie")
     run_dir = _run_path(runs_dir, run_id)
     if not (run_dir / "summary.json").exists():
         raise FileNotFoundError("먼저 GEPA 실행을 완료해야 합니다.")
@@ -796,8 +800,23 @@ def evaluate_run(
     language = saved_language
     scoring_module = "bilingual.py" if is_v2 else "scoring.py"
     scoring_sha256 = _sha256(Path(__file__).with_name(scoring_module))
-    if run_manifest["code_sha256"][f"motif_gepa_ko/{scoring_module}"] != scoring_sha256:
-        raise ValueError("진화 때와 채점 코드가 다릅니다. 보류 평가의 점수 정의를 바꾸지 마세요.")
+    expected_scoring_sha256 = run_manifest["code_sha256"][f"motif_gepa_ko/{scoring_module}"]
+    scoring_runtime_source = "current_code"
+    scorer = score_v2 if is_v2 else score_response
+    if expected_scoring_sha256 != scoring_sha256:
+        frozen_path = run_dir / "inputs" / "code" / "motif_gepa_ko" / scoring_module
+        if not frozen_path.exists() or _sha256(frozen_path) != expected_scoring_sha256:
+            raise ValueError("진화 때의 채점 코드 보존본이 없거나 해시가 다릅니다.")
+        spec = importlib.util.spec_from_file_location(
+            f"_frozen_gepa_scoring_{expected_scoring_sha256[:12]}", frozen_path
+        )
+        if spec is None or spec.loader is None:
+            raise ValueError("진화 때의 채점 코드를 로드할 수 없습니다.")
+        frozen_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(frozen_module)
+        scorer = frozen_module.score_v2 if is_v2 else frozen_module.score_response
+        scoring_runtime_source = "run_code_snapshot"
+        scoring_sha256 = expected_scoring_sha256
     if (
         settings.model != config["model"]
         or settings.base_url != config["base_url"]
@@ -820,6 +839,26 @@ def evaluate_run(
         "seed": (run_dir / "seed_prompt.md").read_text(encoding="utf-8").strip(),
         "best": (run_dir / "best_prompt.md").read_text(encoding="utf-8").strip(),
     }
+    selected_candidate_idx = None
+    selected_val_accuracy = None
+    validation_tie_candidate_indices = None
+    if selection_policy == "latest_val_tie":
+        result = json.loads((run_dir / "gepa_result.json").read_text(encoding="utf-8"))
+        scores = [float(value) for value in result["val_aggregate_scores"]]
+        if not scores or len(scores) != len(result["candidates"]):
+            raise ValueError("Saved GEPA candidate scores are incomplete")
+        selected_val_accuracy = max(scores)
+        validation_tie_candidate_indices = [
+            idx for idx, score in enumerate(scores)
+            if abs(score - selected_val_accuracy) < 1e-12
+        ]
+        selected_candidate_idx = max(validation_tie_candidate_indices)
+        prompts["best"] = result["candidates"][selected_candidate_idx]["system_prompt"].strip()
+    else:
+        optimization_summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+        selected_candidate_idx = optimization_summary.get("best_idx")
+        selected_val_accuracy = optimization_summary.get("best_val_accuracy")
+    identical_prompts = prompts["seed"] == prompts["best"]
     metadata = {
         "schema_version": SCHEMA_VERSION,
         "run_id": run_id,
@@ -832,6 +871,13 @@ def evaluate_run(
         "temperature": settings.temperature,
         "max_output_tokens": settings.max_output_tokens,
         "scoring_code_sha256": scoring_sha256,
+        "scoring_runtime_source": scoring_runtime_source,
+        "evaluation_code_sha256": _sha256(Path(__file__)),
+        "identical_prompt_policy": "reuse_seed_response" if identical_prompts else "separate_inferences",
+        "selection_policy": selection_policy,
+        "selected_candidate_idx": selected_candidate_idx,
+        "selected_val_accuracy": selected_val_accuracy,
+        "validation_tie_candidate_indices": validation_tie_candidate_indices,
     }
     if is_v2:
         metadata["language"] = language
@@ -839,6 +885,7 @@ def evaluate_run(
     if metadata_path.exists() and json.loads(metadata_path.read_text(encoding="utf-8")) != metadata:
         raise ValueError("이전 보류 평가와 데이터·프롬프트·모델·채점 코드가 다릅니다. 새 run_id를 사용하세요.")
     _write_json(metadata_path, metadata)
+    write_text(run_dir / f"{split}_selected_prompt.md", prompts["best"] + "\n")
     session_id = uuid4().hex
     session_path = run_dir / f"{split}_sessions.jsonl"
     append_jsonl(session_path, {
@@ -853,19 +900,23 @@ def evaluate_run(
         for item in records:
             if item["id"] in done:
                 continue
-            if lm.calls + 2 > max_api_calls:
+            if lm.calls + (1 if identical_prompts else 2) > max_api_calls:
                 break
             row = {
                 "id": item["id"], "question": item["question"], "answer": item["answer"],
                 "source_subset": item.get("source_subset"),
                 "source_row_index": item.get("source_row_index"),
+                "same_inference_reused": identical_prompts,
             }
             for name, prompt in prompts.items():
+                if name == "best" and identical_prompts:
+                    row["best"] = dict(row["seed"])
+                    continue
                 lm.context = {"split": split, "question_id": item["id"], "prompt_variant": name}
                 response = lm([{"role": "system", "content": prompt}, {"role": "user", "content": item["question"]}])
                 score, feedback, parsed = (
-                    score_v2(item["answer"], response, language)
-                    if is_v2 else score_response(item["answer"], response)
+                    scorer(item["answer"], response, language)
+                    if is_v2 else scorer(item["answer"], response)
                 )
                 row[name] = {"score": score, "parsed_answer": parsed, "feedback": feedback, "response": response}
             append_jsonl(output_path, row)
@@ -895,6 +946,11 @@ def evaluate_run(
         "dataset_sha256": metadata["dataset_sha256"],
         "seed_prompt_sha256": metadata["seed_prompt_sha256"],
         "best_prompt_sha256": metadata["best_prompt_sha256"],
+        "identical_prompt_policy": metadata["identical_prompt_policy"],
+        "selection_policy": selection_policy,
+        "selected_candidate_idx": selected_candidate_idx,
+        "selected_val_accuracy": selected_val_accuracy,
+        "validation_tie_candidate_indices": validation_tie_candidate_indices,
         "question_ids": [row["id"] for row in selected],
     }
     _write_json(run_dir / f"{split}_summary.json", summary)

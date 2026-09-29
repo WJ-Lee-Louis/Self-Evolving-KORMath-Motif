@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 904 984" role="img" aria-label="GEPA accepted candidate genetic tree">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#202020"/></marker></defs>
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="452.0" y="39" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700">GEPA candidate genetic tree</text>
+<text x="452.0" y="66" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#555">en-omni-v2-clean-b600-t720-s0 · 29 iterations · 600 metric calls</text>
+<line x1="394.46" y1="226.25" x2="185.07" y2="358.16" stroke="#202020" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="420.20" y1="250.10" x2="376.21" y2="333.24" stroke="#202020" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="483.80" y1="250.10" x2="527.79" y2="333.24" stroke="#202020" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="125.00" y1="464.00" x2="125.00" y2="531.00" stroke="#202020" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="125.00" y1="670.00" x2="125.00" y2="737.00" stroke="#202020" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="509.54" y1="226.25" x2="718.93" y2="358.16" stroke="#202020" stroke-width="1.5" marker-end="url(#arrow)"/>
+<a href="#candidate-0" aria-label="Candidate 0, validation 38 of 50">
+<circle cx="452.00" cy="190.00" r="68" fill="#ffad08" stroke="#202020" stroke-width="1.7"/>
+<text x="452.00" y="170.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700">0</text>
+<text x="452.00" y="192.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="14">seed · iter 0</text>
+<text x="452.00" y="218.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="17">38/50 (76%)</text>
+</a>
+<text x="530.00" y="134.00" text-anchor="start" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#a76700">TIED TOP SCORE</text>
+<a href="#candidate-1" aria-label="Candidate 1, validation 36 of 50">
+<circle cx="125.00" cy="396.00" r="68" fill="#d9d9d9" stroke="#202020" stroke-width="1.7"/>
+<text x="125.00" y="376.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700">1</text>
+<text x="125.00" y="398.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="14">iter 4</text>
+<text x="125.00" y="424.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="17">36/50 (72%)</text>
+</a>
+<a href="#candidate-2" aria-label="Candidate 2, validation 33 of 50">
+<circle cx="343.00" cy="396.00" r="68" fill="#d9d9d9" stroke="#202020" stroke-width="1.7"/>
+<text x="343.00" y="376.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700">2</text>
+<text x="343.00" y="398.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="14">iter 8</text>
+<text x="343.00" y="424.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="17">33/50 (66%)</text>
+</a>
+<a href="#candidate-3" aria-label="Candidate 3, validation 36 of 50">
+<circle cx="561.00" cy="396.00" r="68" fill="#d9d9d9" stroke="#202020" stroke-width="1.7"/>
+<text x="561.00" y="376.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700">3</text>
+<text x="561.00" y="398.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="14">iter 19</text>
+<text x="561.00" y="424.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="17">36/50 (72%)</text>
+</a>
+<a href="#candidate-4" aria-label="Candidate 4, validation 38 of 50">
+<circle cx="125.00" cy="602.00" r="68" fill="#1bd9e5" stroke="#202020" stroke-width="1.7"/>
+<text x="125.00" y="582.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700">4</text>
+<text x="125.00" y="604.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="14">iter 20</text>
+<text x="125.00" y="630.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="17">38/50 (76%)</text>
+</a>
+<text x="203.00" y="546.00" text-anchor="start" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#087b87">TEST SELECTED</text>
+<a href="#candidate-5" aria-label="Candidate 5, validation 34 of 50">
+<circle cx="125.00" cy="808.00" r="68" fill="#d9d9d9" stroke="#202020" stroke-width="1.7"/>
+<text x="125.00" y="788.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700">5</text>
+<text x="125.00" y="810.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="14">iter 22</text>
+<text x="125.00" y="836.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="17">34/50 (68%)</text>
+</a>
+<a href="#candidate-6" aria-label="Candidate 6, validation 37 of 50">
+<circle cx="779.00" cy="396.00" r="68" fill="#ffad08" stroke="#202020" stroke-width="1.7"/>
+<text x="779.00" y="376.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700">6</text>
+<text x="779.00" y="398.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="14">iter 28</text>
+<text x="779.00" y="424.00" text-anchor="middle" font-family="Arial, sans-serif" font-size="17">37/50 (74%)</text>
+</a>
+<g font-family="Arial, sans-serif" font-size="14"><circle cx="115" cy="941" r="9" fill="#1bd9e5" stroke="#202020"/><text x="132" y="946">test selected</text><circle cx="392" cy="941" r="9" fill="#ffad08" stroke="#202020"/><text x="409" y="946">Pareto frontier</text><circle cx="622" cy="941" r="9" fill="#d9d9d9" stroke="#202020"/><text x="639" y="946">other candidate</text></g>
+</svg>
