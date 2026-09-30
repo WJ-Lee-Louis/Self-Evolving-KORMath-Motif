@@ -126,6 +126,70 @@ def evaluate_remote(run_id: str, split: str, limit: int, max_api_calls: int,
         volume.commit()
 
 
+@app.function(image=image, secrets=[secret], volumes={"/results": volume}, timeout=86400,
+              retries=modal.Retries(initial_delay=0.0, max_retries=10), cpu=1.0, memory=1024)
+def evaluate_shard_remote(run_id: str, shard_index: int, shard_count: int,
+                          max_api_calls: int = 400, dataset: str = "omni_v2_clean",
+                          language: str = "ko", selection_policy: str = "gepa") -> dict:
+    from motif_gepa_ko.sharded_evaluation import (
+        aggregate_shards_if_complete, evaluate_shard_run,
+    )
+
+    volume.reload()
+    try:
+        summary = evaluate_shard_run(
+            data_dir=dataset_dir(dataset), runs_dir=Path("/results"),
+            run_id=run_id, language=language, shard_index=shard_index,
+            shard_count=shard_count, max_api_calls=max_api_calls,
+            selection_policy=selection_policy,
+            checkpoint_hook=volume.commit,
+        )
+        volume.commit()
+        volume.reload()
+        aggregate = aggregate_shards_if_complete(
+            data_dir=dataset_dir(dataset), runs_dir=Path("/results"),
+            run_id=run_id, language=language, shard_count=shard_count,
+        )
+        if aggregate is not None:
+            volume.commit()
+        return {"shard": summary, "aggregate_ready": aggregate is not None}
+    finally:
+        volume.commit()
+
+
+@app.function(image=image, volumes={"/results": volume}, timeout=300,
+              cpu=0.25, memory=512)
+def aggregate_test_shards_remote(run_id: str, shard_count: int = 4,
+                                 dataset: str = "omni_v2_clean", language: str = "ko") -> dict | None:
+    from motif_gepa_ko.sharded_evaluation import aggregate_shards_if_complete
+
+    volume.reload()
+    result = aggregate_shards_if_complete(
+        data_dir=dataset_dir(dataset), runs_dir=Path("/results"),
+        run_id=run_id, language=language, shard_count=shard_count,
+    )
+    if result is not None:
+        volume.commit()
+    return result
+
+
+@app.function(image=image, volumes={"/results": volume}, timeout=300,
+              cpu=0.25, memory=512)
+def bootstrap_test_shards_remote(run_id: str, shard_count: int = 4,
+                                 dataset: str = "omni_v2_clean", language: str = "en",
+                                 selection_policy: str = "latest_val_tie") -> dict:
+    from motif_gepa_ko.sharded_evaluation import bootstrap_unsharded_rows
+
+    volume.reload()
+    result = bootstrap_unsharded_rows(
+        data_dir=dataset_dir(dataset), runs_dir=Path("/results"),
+        run_id=run_id, language=language, shard_count=shard_count,
+        selection_policy=selection_policy,
+    )
+    volume.commit()
+    return result
+
+
 @app.local_entrypoint()
 def preflight(dataset: str = "hrm8k_v1", language: str = "ko") -> None:
     print(preflight_remote.remote(dataset, language))
@@ -152,3 +216,26 @@ def evaluate(run_id: str, split: str, limit: int = 20, max_api_calls: int = 100,
              selection_policy: str = "gepa") -> None:
     print(evaluate_remote.spawn(run_id, split, limit, max_api_calls, dataset, language,
                                 selection_policy).get())
+
+
+@app.local_entrypoint()
+def evaluate_shard(run_id: str, shard_index: int, shard_count: int = 4,
+                   max_api_calls: int = 400, dataset: str = "omni_v2_clean",
+                   language: str = "ko", selection_policy: str = "gepa") -> None:
+    print(evaluate_shard_remote.spawn(run_id, shard_index, shard_count,
+                                      max_api_calls, dataset, language,
+                                      selection_policy).get())
+
+
+@app.local_entrypoint()
+def aggregate_test_shards(run_id: str, shard_count: int = 4,
+                          dataset: str = "omni_v2_clean", language: str = "ko") -> None:
+    print(aggregate_test_shards_remote.remote(run_id, shard_count, dataset, language))
+
+
+@app.local_entrypoint()
+def bootstrap_test_shards(run_id: str, shard_count: int = 4,
+                          dataset: str = "omni_v2_clean", language: str = "en",
+                          selection_policy: str = "latest_val_tie") -> None:
+    print(bootstrap_test_shards_remote.remote(run_id, shard_count, dataset,
+                                              language, selection_policy))

@@ -1,5 +1,7 @@
 # Motif 3 기반 한국어·영어 GEPA 실험
 
+**현재 실행:** 완료된 한국어·영어 `omni_v2_clean` 진화 결과의 test 760문항을 언어별 4개 Modal 작업으로 평가 중입니다. 샤드·집계·실행 링크는 [4분할 test 평가 기록](docs/OMNI_SHARDED_TEST.md), 한국어 프롬프트 계보는 [한국어 genetic tree](reports/ko-omni-v2-clean-b600-t720-s0/GENETIC_TREE.md)를 참고하세요.
+
 **새 실험:** 한국어·영어 Omni-MATH 프롬프트 진화 비교는 [Omni v2 설계 및 실행 안내](docs/OMNI_V2_BILINGUAL.md)를 참고하세요. 독립적으로 다시 분할한 train 1,000·val 50·test 768문항을 사용하며, 기존 `omni_v1` 실행의 진화 프롬프트는 새 실험에 재사용하지 않습니다.
 
 확정된 HRM8K 데이터 구성과 문항별 분할 규칙은 [데이터 분할 문서](docs/DATA_SPLITS.md)를 참고하세요. 생성된 JSONL과 전체 원본 행 번호 목록은 [`data/hrm8k_v1/`](data/hrm8k_v1/)에 있습니다.

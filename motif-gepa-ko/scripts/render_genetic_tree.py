@@ -177,9 +177,13 @@ def render_svg(data: dict) -> str:
             '</a>',
         ])
         if selected:
-            label_x = x if idx == 0 else x + NODE_RADIUS + 10
-            label_y = y - NODE_RADIUS - 13 if idx == 0 else y - NODE_RADIUS + 12
-            label_anchor = "middle" if idx == 0 else "start"
+            parent_indices = node["parent_candidate_indices"]
+            vertical_parent = bool(parent_indices) and math.isclose(
+                data["positions"][int(parent_indices[0])][0], x
+            )
+            label_x = x + NODE_RADIUS + 10 if vertical_parent else x
+            label_y = y - NODE_RADIUS + 12 if vertical_parent else y - NODE_RADIUS - 13
+            label_anchor = "start" if vertical_parent else "middle"
             parts.append(
                 f'<text x="{label_x:.2f}" y="{label_y:.2f}" '
                 f'text-anchor="{label_anchor}" '
@@ -300,15 +304,23 @@ def render_markdown(data: dict) -> str:
             f'{"예" if idx == data["best_idx"] else "아니요"} |'
         )
     ties = ", ".join(f'#{idx}' for idx in data["tied_best"])
-    selection_explanation = (
-        f'검증 최고 성적은 {ties}가 동률이다. GEPA 기본 규칙은 먼저 등록된 '
-        f'#{data["gepa_best_idx"]}을 선택하지만, 이번 test 평가에서는 사전에 정한 '
-        f'`latest_val_tie` 규칙에 따라 나중에 등록된 #{data["best_idx"]}를 선택했다. '
-        '원래 GEPA 결과 파일은 수정하지 않았다.'
-        if data["selection_policy"] != "gepa" else
-        f'최고 검증 성적은 {ties}가 동률이다. GEPA의 `best_idx`는 최고점 후보 중 '
-        f'번호가 가장 작은 #{data["best_idx"]}을 반환하므로 최종 프롬프트는 초기 프롬프트다.'
-    )
+    if data["selection_policy"] != "gepa":
+        selection_explanation = (
+            f'검증 최고 성적은 {ties}가 동률이다. GEPA 기본 규칙은 먼저 등록된 '
+            f'#{data["gepa_best_idx"]}을 선택하지만, 이번 test 평가에서는 사전에 정한 '
+            f'`latest_val_tie` 규칙에 따라 나중에 등록된 #{data["best_idx"]}를 선택했다. '
+            '원래 GEPA 결과 파일은 수정하지 않았다.'
+        )
+    elif len(data["tied_best"]) == 1:
+        selection_explanation = (
+            f'후보 #{data["best_idx"]}이 검증 최고점을 단독으로 기록하여 GEPA 최종 '
+            '프롬프트로 선정됐다. 초기 후보와 다른 프롬프트다.'
+        )
+    else:
+        selection_explanation = (
+            f'최고 검증 성적은 {ties}가 동률이다. GEPA의 `best_idx`는 최고점 후보 중 '
+            f'번호가 가장 작은 #{data["best_idx"]}을 반환한다.'
+        )
     lines += [
         '',
         selection_explanation,
