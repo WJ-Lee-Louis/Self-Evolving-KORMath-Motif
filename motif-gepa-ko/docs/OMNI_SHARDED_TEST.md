@@ -19,3 +19,14 @@
 ```
 
 Modal의 각 함수 실행 한도는 24시간이며, 각 샤드는 중단 시 저장한 완료 응답 쌍부터 재개한다. 네 함수가 병렬로 실행되더라도 같은 Motif API 계정의 공급자 처리량이 4배로 늘어난다는 보장은 없으므로, 완료 속도와 HTTP 오류를 함께 관찰해야 한다.
+
+## 2026-10-02 재개 기록
+
+14:13 KST에 이전 8개 작업이 모두 종료된 것을 확인했다. 저장된 응답 쌍은 영어 340/760, 한국어 216/760이었다. 한국어는 처음 확인할 때 샤드 1의 Volume 읽기가 실패해 60개를 누락 집계했으며, 14:25 KST에 각 샤드 파일을 다시 내려받아 20+60+70+66=216개로 바로잡았다. 같은 실행 ID와 평가 규칙으로 재개했으나, 인프론은 서로 다른 문항 및 로컬 연결 시험에도 HTTP 503 `No available providers for model motif/motif-3`를 반환했다. 빠른 Modal 재시도를 소진한 첫 재개 작업들은 종료됐다.
+
+14:16 KST에 `modal_experiment.py`의 샤드 실행부에 공급자 부재 503만을 대상으로 하는 60→120→240→300초 간격의 재시도를 추가하고 다시 실행했다. 이 변경은 저장된 문제, 프롬프트, 채점 코드, 샤드 메타데이터 및 완료 응답을 변경하지 않는다. 공급자가 복구되면 각 샤드가 저장된 응답 쌍 이후부터 계속한다. 이 상태는 공급자가 복구됐다는 뜻이 아니며, 완료 여부는 Volume의 `summary.json`과 전체 `test_id_shards_aggregate.json`으로 확인해야 한다.
+
+| 언어 | 샤드 0 | 샤드 1 | 샤드 2 | 샤드 3 |
+|---|---|---|---|---|
+| 영어 | [Modal](https://modal.com/apps/woojin716/main/ap-1ZnIlCkDazd1pCZWAN7CmF) | [Modal](https://modal.com/apps/woojin716/main/ap-5ATOABfSdMHu59XqZsZOdD) | [Modal](https://modal.com/apps/woojin716/main/ap-L9KE4kD5AjmdTRdl9fwE78) | [Modal](https://modal.com/apps/woojin716/main/ap-5pJezzfHssqN2R4jXDqD75) |
+| 한국어 | [Modal](https://modal.com/apps/woojin716/main/ap-q50MtDxsb1DGCw4Ops6UK3) | [Modal](https://modal.com/apps/woojin716/main/ap-1W2nSQb0IwC5mH0FNbYnXm) | [Modal](https://modal.com/apps/woojin716/main/ap-NDuP0Ndq8vMbnXHzBOXHpd) | [Modal](https://modal.com/apps/woojin716/main/ap-w7JelWeNwkmtbdANwsSVxP) |

@@ -131,19 +131,38 @@ def evaluate_remote(run_id: str, split: str, limit: int, max_api_calls: int,
 def evaluate_shard_remote(run_id: str, shard_index: int, shard_count: int,
                           max_api_calls: int = 400, dataset: str = "omni_v2_clean",
                           language: str = "ko", selection_policy: str = "gepa") -> dict:
+    import time
+
+    from openai import InternalServerError
     from motif_gepa_ko.sharded_evaluation import (
         aggregate_shards_if_complete, evaluate_shard_run,
     )
 
-    volume.reload()
     try:
-        summary = evaluate_shard_run(
-            data_dir=dataset_dir(dataset), runs_dir=Path("/results"),
-            run_id=run_id, language=language, shard_index=shard_index,
-            shard_count=shard_count, max_api_calls=max_api_calls,
-            selection_policy=selection_policy,
-            checkpoint_hook=volume.commit,
-        )
+        outage_wait_seconds = 60
+        while True:
+            volume.reload()
+            try:
+                summary = evaluate_shard_run(
+                    data_dir=dataset_dir(dataset), runs_dir=Path("/results"),
+                    run_id=run_id, language=language, shard_index=shard_index,
+                    shard_count=shard_count, max_api_calls=max_api_calls,
+                    selection_policy=selection_policy,
+                    checkpoint_hook=volume.commit,
+                )
+                break
+            except InternalServerError as exc:
+                if (exc.status_code != 503
+                        or "No available providers for model" not in str(exc)):
+                    raise
+                volume.commit()
+                print(
+                    f"Motif provider unavailable for {language} shard {shard_index}; "
+                    f"retrying in {outage_wait_seconds} seconds.",
+                    flush=True,
+                )
+                time.sleep(outage_wait_seconds)
+                outage_wait_seconds = min(outage_wait_seconds * 2, 300)
         volume.commit()
         volume.reload()
         aggregate = aggregate_shards_if_complete(
